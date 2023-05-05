@@ -3,9 +3,6 @@ use std::mem;
 use std::ptr;
 pub mod solace;
 
-#[macro_use]
-extern crate enum_primitive;
-
 use enum_primitive::*;
 use solace::ffi;
 
@@ -35,7 +32,7 @@ enum SolaceLogLevel {
 
 struct SolContext {
     // This pointer must never be allowed to leave the struct
-    ctx: ffi::solClient_opaqueContext_pt,
+    _ctx: ffi::solClient_opaqueContext_pt,
 }
 
 // Solace initializes global variables
@@ -73,7 +70,7 @@ impl SolContext {
             panic!("Could not initialize solace context");
             //return Err(SolaceError);
         }
-        return Ok(Self { ctx });
+        Ok(Self { _ctx: ctx })
     }
 }
 
@@ -81,6 +78,9 @@ impl Drop for SolContext {
     fn drop(&mut self) {
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
+            // TODO
+            // remove
+            // undefined behavior to panic in drop
             panic!("Solace context did not drop properly");
         }
     }
@@ -89,7 +89,7 @@ impl Drop for SolContext {
 struct SolSession {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
-    session_pt: ffi::solClient_opaqueSession_pt,
+    _session_pt: ffi::solClient_opaqueSession_pt,
 }
 
 // TODO
@@ -100,7 +100,7 @@ extern "C" fn on_event(
     event_info_p: ffi::solClient_session_eventCallbackInfo_pt,
     user_p: *mut ::std::os::raw::c_void,
 ) {
-    println!("Event callback");
+    println!("some event recienved");
 }
 
 extern "C" fn on_message(
@@ -108,8 +108,12 @@ extern "C" fn on_message(
     msg_p: ffi::solClient_opaqueMsg_pt,
     user_p: *mut ::std::os::raw::c_void,
 ) -> ffi::solClient_rxMsgCallback_returnCode_t {
+    unsafe {
+        ffi::solClient_msg_dump(msg_p, ptr::null_mut(), 0);
+    }
     println!("Message callback");
-    return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
+
+    ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
 }
 
 impl SolSession {
@@ -133,7 +137,6 @@ impl SolSession {
         let c_password = std::ffi::CString::new(password).expect("Invalid password");
 
         let session_props = [
-            ptr::null() as *const u8,
             ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr(),
             c_host_name.as_ptr() as *const u8,
             ffi::SOLCLIENT_SESSION_PROP_VPN_NAME.as_ptr(),
@@ -142,6 +145,8 @@ impl SolSession {
             c_username.as_ptr() as *const u8,
             ffi::SOLCLIENT_SESSION_PROP_PASSWORD.as_ptr(),
             c_password.as_ptr() as *const u8,
+            ffi::SOLCLIENT_SESSION_PROP_CONNECT_BLOCKING.as_ptr(),
+            ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr(),
             ptr::null(),
         ]
         .as_mut_ptr() as *mut *const i8;
@@ -171,7 +176,7 @@ impl SolSession {
         let session_create_result = unsafe {
             ffi::solClient_session_create(
                 session_props,
-                context.ctx,
+                context._ctx,
                 &mut session_pt,
                 &mut session_func_info,
                 std::mem::size_of::<ffi::solClient_session_createFuncInfo_t>(),
@@ -183,44 +188,64 @@ impl SolSession {
             //return Err(SolaceError);
         }
 
-        Ok(SolSession { session_pt })
+        let connection_result;
+        unsafe {
+            connection_result = ffi::solClient_session_connect(session_pt);
+        }
+        if connection_result == ffi::solClient_returnCode_SOLCLIENT_OK {
+            Ok(SolSession {
+                _session_pt: session_pt,
+            })
+        } else {
+            println!("Solace did not connect properly");
+            println!("Returned: {}", connection_result);
+
+            Err(SolaceError)
+        }
     }
 
+    #[allow(dead_code)]
     pub fn publish(&self) -> Result<()> {
-        Ok(())
+        todo!();
     }
 
+    #[allow(dead_code)]
     pub fn subscribe() -> Result<()> {
-        Ok(())
+        todo!();
     }
 
+    #[allow(dead_code)]
     pub fn unsubscribe() -> Result<()> {
-        Ok(())
+        todo!();
     }
 }
 
 impl Drop for SolSession {
-    fn drop(&mut self) {
-        
-    }
+    fn drop(&mut self) {}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread::sleep;
+    use std::time::Duration;
 
     #[test]
     fn it_works() {
         let solace_context = SolContext::new(SolaceLogLevel::Info).unwrap();
         println!("Context created");
-        let host_name = format!("tcps://localhost:8008");
-        let vpn_name = format!("default");
-        let username = format!("default");
-        let password = format!("");
+        let host_name = "tcp://localhost:55554".to_string();
+        let vpn_name = "default".to_string();
+        let username = "default".to_string();
+        let password = "".to_string();
 
-        let _solace_session =
+        let solace_session =
             SolSession::new(host_name, vpn_name, username, password, &solace_context);
+        assert!(solace_session.is_ok());
+
         println!("Session created");
+
+        sleep(Duration::new(120, 0));
 
         assert_eq!(true, true);
     }
