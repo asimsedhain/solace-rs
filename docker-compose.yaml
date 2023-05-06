@@ -7,7 +7,7 @@ services:
     image: solace/solace-pubsub-standard:latest
     shm_size: 1g
     ulimits:
-      core: -1
+      core: 2
       nofile:
         soft: 2448
         hard: 6592
