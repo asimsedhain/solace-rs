@@ -129,12 +129,88 @@ impl SolSession {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn publish(&self) -> Result<()> {
-        todo!();
+    pub fn publish<T, M>(&self, topic: T, message: M) -> Result<()>
+    where
+        M: Into<String>,
+        T: Into<Vec<u8>>,
+    {
+        // to accomplish the publishing,
+        // we will create a null_ptr
+        // allocate it using the provided function
+        // attach the destination to the ptr
+        // attach the message to the ptr
+        //
+        // for attaching the message to the ptr, we have a couple of options
+        // based on those options, we can create a couple of interfaces
+        //
+        // solClient_msg_setBinaryAttachmentPtr (solClient_opaqueMsg_pt msg_p, void *buf_p, solClient_uint32_t size)
+        // Given a msg_p, set the contents of a Binary Attachment Part to the given pointer and size.
+        //
+        // solClient_msg_setBinaryAttachment (solClient_opaqueMsg_pt msg_p, const void *buf_p, solClient_uint32_t size)
+        // Given a msg_p, set the contents of the binary attachment part by copying in from the given pointer and size.
+        //
+        // solClient_msg_setBinaryAttachmentString (solClient_opaqueMsg_pt msg_p, const char *buf_p)
+        // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
+        //
+
+        let c_topic = CString::new(topic).expect("Invalid topic");
+
+        let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
+
+        let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
+        assert_eq!(
+            SolaceReturnCode::from_i32(msg_alloc_result),
+            Some(SolaceReturnCode::OK)
+        );
+
+        let set_delivery_result = unsafe {
+            ffi::solClient_msg_setDeliveryMode(msg_ptr, ffi::SOLCLIENT_DELIVERY_MODE_DIRECT)
+        };
+        assert_eq!(
+            SolaceReturnCode::from_i32(set_delivery_result),
+            Some(SolaceReturnCode::OK)
+        );
+
+        let mut destination: ffi::solClient_destination = ffi::solClient_destination {
+            destType: ffi::solClient_destinationType_SOLCLIENT_TOPIC_DESTINATION,
+            dest: c_topic.as_ptr(),
+        };
+
+        let set_destination_result = unsafe {
+            ffi::solClient_msg_setDestination(
+                msg_ptr,
+                &mut destination,
+                std::mem::size_of::<ffi::solClient_destination>(),
+            )
+        };
+        assert_eq!(
+            SolaceReturnCode::from_i32(set_destination_result),
+            Some(SolaceReturnCode::OK)
+        );
+
+        let c_message = CString::new(message.into()).expect("Invalid message");
+
+        let set_attachment_result =
+            unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
+        assert_eq!(
+            SolaceReturnCode::from_i32(set_attachment_result),
+            Some(SolaceReturnCode::OK)
+        );
+
+        let send_message_result =
+            unsafe { ffi::solClient_session_sendMsg(self._session_pt, msg_ptr) };
+        assert_eq!(
+            SolaceReturnCode::from_i32(send_message_result),
+            Some(SolaceReturnCode::OK)
+        );
+
+        unsafe {
+            ffi::solClient_msg_free(&mut msg_ptr);
+        }
+
+        Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn subscribe<T>(&self, topic: T) -> Result<()>
     where
         T: Into<Vec<u8>>,
@@ -149,7 +225,6 @@ impl SolSession {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn unsubscribe<T>(&self, topic: T) -> Result<()>
     where
         T: Into<Vec<u8>>,
@@ -198,7 +273,17 @@ mod tests {
         let sub_result = session.subscribe(topic);
         assert!(sub_result.is_ok());
 
-        let sleep_duration = Duration::new(120, 0);
+        println!("Sleeping for 10 secs before publishig messages",);
+        sleep(Duration::new(10, 0));
+
+        for i in 0..10 {
+            session
+                .publish(topic, format!("hello from rust: {}", i))
+                .expect("message to be sent");
+            sleep(Duration::new(1, 0));
+        }
+
+        let sleep_duration = Duration::new(60, 0);
         println!("Sleeping for {:?}", sleep_duration);
         sleep(sleep_duration);
 
