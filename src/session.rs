@@ -1,13 +1,14 @@
 use crate::context::SolContext;
 use crate::solace::ffi;
-use crate::{Result, SolaceError};
+use crate::{Result, SolaceError, SolaceReturnCode};
+use num_traits::FromPrimitive;
 use std::ffi::CString;
 use std::ptr;
 
 pub struct SolSession {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
-    _session_pt: ffi::solClient_opaqueSession_pt,
+    pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
 }
 
 // TODO
@@ -109,16 +110,14 @@ impl SolSession {
             )
         };
 
-        if session_create_result != ffi::solClient_returnCode_SOLCLIENT_OK {
+        if SolaceReturnCode::from_i32(session_create_result) != Some(SolaceReturnCode::OK) {
             panic!("Could not initialize solace session");
             //return Err(SolaceError);
         }
 
-        let connection_result;
-        unsafe {
-            connection_result = ffi::solClient_session_connect(session_pt);
-        }
-        if connection_result == ffi::solClient_returnCode_SOLCLIENT_OK {
+        let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
+
+        if SolaceReturnCode::from_i32(connection_result) == Some(SolaceReturnCode::OK) {
             Ok(SolSession {
                 _session_pt: session_pt,
             })
@@ -136,13 +135,33 @@ impl SolSession {
     }
 
     #[allow(dead_code)]
-    pub fn subscribe() -> Result<()> {
-        todo!();
+    pub fn subscribe<T>(&self, topic: T) -> Result<()>
+    where
+        T: Into<Vec<u8>>,
+    {
+        let c_topic = CString::new(topic).expect("Invalid topic");
+        let subscription_result =
+            unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
+
+        if SolaceReturnCode::from_i32(subscription_result) != Some(SolaceReturnCode::OK) {
+            return Err(SolaceError);
+        }
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn unsubscribe() -> Result<()> {
-        todo!();
+    pub fn unsubscribe<T>(&self, topic: T) -> Result<()>
+    where
+        T: Into<Vec<u8>>,
+    {
+        let c_topic = CString::new(topic).expect("Invalid topic");
+        let subscription_result =
+            unsafe { ffi::solClient_session_topicUnsubscribe(self._session_pt, c_topic.as_ptr()) };
+
+        if SolaceReturnCode::from_i32(subscription_result) != Some(SolaceReturnCode::OK) {
+            return Err(SolaceError);
+        }
+        Ok(())
     }
 }
 
@@ -159,21 +178,33 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let solace_context = SolContext::new(SolaceLogLevel::Info).unwrap();
+        let solace_context = SolContext::new(SolaceLogLevel::Warning).unwrap();
         println!("Context created");
         let host_name = "tcp://localhost:55554";
         let vpn_name = "default";
         let username = "default";
         let password = "";
-
-        let solace_session =
+        let session_result =
             SolSession::new(host_name, vpn_name, username, password, &solace_context);
-        assert!(solace_session.is_ok());
 
+        let Ok(session) = session_result else{
+            panic!();
+        };
+
+        let topic = "try-me";
         println!("Session created");
+        println!("Subscribing to {} topic", topic);
 
-        sleep(Duration::new(120, 0));
+        let sub_result = session.subscribe(topic);
+        assert!(sub_result.is_ok());
 
-        assert_eq!(true, true);
+        let sleep_duration = Duration::new(120, 0);
+        println!("Sleeping for {:?}", sleep_duration);
+        sleep(sleep_duration);
+
+        println!("Unsubscribing to {} topic", topic);
+
+        let sub_result = session.unsubscribe(topic);
+        assert!(sub_result.is_ok());
     }
 }
