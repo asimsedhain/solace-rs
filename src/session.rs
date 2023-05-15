@@ -1,4 +1,5 @@
 use crate::context::SolContext;
+use crate::message::{InboundMessage, Message};
 use crate::solace::ffi;
 use crate::{Result, SolaceError, SolaceReturnCode};
 use num_traits::FromPrimitive;
@@ -27,10 +28,35 @@ extern "C" fn on_message(
     msg_p: ffi::solClient_opaqueMsg_pt,
     user_p: *mut ::std::os::raw::c_void,
 ) -> ffi::solClient_rxMsgCallback_returnCode_t {
+    println!("On message callback started");
+
+    println!("Printing using solace function");
     unsafe {
         ffi::solClient_msg_dump(msg_p, ptr::null_mut(), 0);
     }
-    println!("Message callback");
+    println!("Trying to duplicate message");
+
+    let mut dup_msg_ptr = ptr::null_mut();
+
+    unsafe { ffi::solClient_msg_dup(msg_p, &mut dup_msg_ptr) };
+
+    println!("Successfully called the dup func");
+
+    let message = InboundMessage {
+        msg_ptr: dup_msg_ptr,
+    };
+
+    let payload = message.get_payload_as_bytes();
+    if let Ok(payload_bytes) = payload {
+        let message = std::str::from_utf8(payload_bytes);
+        if let Ok(str) = message {
+            println!("Printing from rust method \n {}", str);
+        } else {
+            println!("Invalid payload str");
+        }
+    } else {
+        println!("Could not print using rust method");
+    }
 
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
 }
@@ -282,6 +308,38 @@ mod tests {
                 .expect("message to be sent");
             sleep(Duration::new(1, 0));
         }
+
+        let sleep_duration = Duration::new(30, 0);
+        println!("Sleeping for {:?}", sleep_duration);
+        sleep(sleep_duration);
+
+        println!("Unsubscribing to {} topic", topic);
+
+        let sub_result = session.unsubscribe(topic);
+        assert!(sub_result.is_ok());
+    }
+
+    #[test]
+    fn it_subscribes_and_listens() {
+        let solace_context = SolContext::new(SolaceLogLevel::Warning).unwrap();
+        println!("Context created");
+        let host_name = "tcp://localhost:55554";
+        let vpn_name = "default";
+        let username = "default";
+        let password = "";
+        let session_result =
+            SolSession::new(host_name, vpn_name, username, password, &solace_context);
+
+        let Ok(session) = session_result else{
+            panic!();
+        };
+
+        let topic = "try-me";
+        println!("Session created");
+        println!("Subscribing to {} topic", topic);
+
+        let sub_result = session.subscribe(topic);
+        assert!(sub_result.is_ok());
 
         let sleep_duration = Duration::new(60, 0);
         println!("Sleeping for {:?}", sleep_duration);
