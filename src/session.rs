@@ -60,11 +60,11 @@ extern "C" fn on_message(
 }
 
 impl SolSession {
-    pub fn new<T>(
-        host_name: T,
-        vpn_name: T,
-        username: T,
-        password: T,
+    pub fn new<H, V, U, P>(
+        host_name: H,
+        vpn_name: V,
+        username: U,
+        password: P,
         // since the solace_context has the threading library
         // might be good to get the context entirely instead of a reference to the context
         context: &SolContext,
@@ -72,7 +72,10 @@ impl SolSession {
         //on_event: Fn,
     ) -> Result<Self>
     where
-        T: Into<Vec<u8>>,
+        H: Into<Vec<u8>>,
+        V: Into<Vec<u8>>,
+        U: Into<Vec<u8>>,
+        P: Into<Vec<u8>>,
     {
         /* Session */
         //solClient_opaqueSession_pt session_p;
