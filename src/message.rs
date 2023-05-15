@@ -5,10 +5,24 @@ use std::convert::From;
 use std::ffi::CStr;
 use std::ops::Drop;
 use std::ptr;
+use std::time::SystemTime;
+
+pub enum ClassOfServive {
+    One,
+    Two,
+    Three,
+}
 
 pub trait Message<'a> {
     fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]>;
     fn get_payload_as_str(&'a self) -> Result<&'a str>;
+    fn get_application_message_id(&'a self) -> Result<&'a str>;
+    fn get_application_message_type(&'a self) -> Result<&'a str>;
+    fn get_class_of_service(&'a self) -> Result<ClassOfServive>;
+    fn get_correlation_id(&'a self) -> Result<&'a str>;
+    fn get_expiration(&'a self) -> Result<SystemTime>;
+    fn get_priority(&'a self) -> Result<u8>;
+    fn get_sequence_number(&'a self) -> Result<i64>;
 }
 
 pub struct InboundMessage {
@@ -16,6 +30,8 @@ pub struct InboundMessage {
 }
 
 impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
+    // From owned pointer
+    // InboundMessage will try to free the ptr when it is destroyed
     fn from(ptr: ffi::solClient_opaqueMsg_pt) -> Self {
         InboundMessage { msg_ptr: ptr }
     }
@@ -81,5 +97,27 @@ impl<'a> Message<'a> for InboundMessage {
 
         let c_str = unsafe { CStr::from_ptr(buffer) };
         return c_str.to_str().map_err(|_| SolaceError);
+    }
+
+    fn get_application_message_id(&'a self) -> Result<&'a str> {
+        todo!()
+    }
+    fn get_application_message_type(&'a self) -> Result<&'a str> {
+        todo!()
+    }
+    fn get_class_of_service(&'a self) -> Result<ClassOfServive> {
+        todo!()
+    }
+    fn get_correlation_id(&'a self) -> Result<&'a str> {
+        todo!()
+    }
+    fn get_expiration(&'a self) -> Result<SystemTime> {
+        todo!()
+    }
+    fn get_priority(&'a self) -> Result<u8> {
+        todo!()
+    }
+    fn get_sequence_number(&'a self) -> Result<i64> {
+        todo!()
     }
 }
