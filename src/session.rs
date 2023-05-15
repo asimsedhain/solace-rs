@@ -42,9 +42,7 @@ extern "C" fn on_message(
 
     println!("Successfully called the dup func");
 
-    let message = InboundMessage {
-        msg_ptr: dup_msg_ptr,
-    };
+    let message = InboundMessage::from(dup_msg_ptr);
 
     let payload = message.get_payload_as_bytes();
     if let Ok(payload_bytes) = payload {
