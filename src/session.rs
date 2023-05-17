@@ -1,7 +1,7 @@
 use crate::context::SolContext;
 use crate::message::InboundMessage;
 use crate::solace::ffi;
-use crate::{Result, SolaceError, SolaceReturnCode};
+use crate::{Result, SolaceError, SolClientReturnCode};
 use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString};
 use std::ptr;
@@ -16,9 +16,9 @@ pub struct SolSession {
 // These are temp callbacks
 // Implement callbacks that can be passed in
 extern "C" fn on_event(
-    opaque_session_p: ffi::solClient_opaqueSession_pt,
-    event_info_p: ffi::solClient_session_eventCallbackInfo_pt,
-    user_p: *mut ::std::os::raw::c_void,
+    opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
+    event_info_p: ffi::solClient_session_eventCallbackInfo_pt, //non-null
+    user_p: *mut ::std::os::raw::c_void,               // can be null
 ) {
     println!("some event recienved");
 }
@@ -31,9 +31,9 @@ where
 }
 
 extern "C" fn static_on_message<F>(
-    _opaque_session_p: ffi::solClient_opaqueSession_pt,
-    msg_p: ffi::solClient_opaqueMsg_pt,
-    raw_user_closure: *mut ::std::os::raw::c_void,
+    _opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
+    msg_p: ffi::solClient_opaqueMsg_pt,                 // non-null
+    raw_user_closure: *mut ::std::os::raw::c_void,      // can be null
 ) -> ffi::solClient_rxMsgCallback_returnCode_t
 where
     // not completely sure if this is supposed to be FnMut or FnOnce
@@ -46,11 +46,17 @@ where
     // also this function will only be called from the context thread, so it should be thread safe
     // as well
 
+    let non_null_raw_user_closure = std::ptr::NonNull::new(raw_user_closure);
+
+    let Some(raw_user_closure) =  non_null_raw_user_closure else{
+        return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
+    };
+
     let mut dup_msg_ptr = ptr::null_mut();
     unsafe { ffi::solClient_msg_dup(msg_p, &mut dup_msg_ptr) };
 
     let message = InboundMessage::from(dup_msg_ptr);
-    let user_closure = unsafe { &mut *(raw_user_closure as *mut F) };
+    let user_closure = unsafe { &mut *(raw_user_closure.as_ptr() as *mut F) };
     user_closure(message);
 
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
@@ -143,14 +149,14 @@ impl SolSession {
             )
         };
 
-        if SolaceReturnCode::from_i32(session_create_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(session_create_result) != Some(SolClientReturnCode::OK) {
             panic!("Could not initialize solace session");
             //return Err(SolaceError);
         }
 
         let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
 
-        if SolaceReturnCode::from_i32(connection_result) == Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::OK) {
             Ok(SolSession {
                 _session_pt: session_pt,
             })
@@ -192,16 +198,16 @@ impl SolSession {
 
         let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
         assert_eq!(
-            SolaceReturnCode::from_i32(msg_alloc_result),
-            Some(SolaceReturnCode::OK)
+            SolClientReturnCode::from_i32(msg_alloc_result),
+            Some(SolClientReturnCode::OK)
         );
 
         let set_delivery_result = unsafe {
             ffi::solClient_msg_setDeliveryMode(msg_ptr, ffi::SOLCLIENT_DELIVERY_MODE_DIRECT)
         };
         assert_eq!(
-            SolaceReturnCode::from_i32(set_delivery_result),
-            Some(SolaceReturnCode::OK)
+            SolClientReturnCode::from_i32(set_delivery_result),
+            Some(SolClientReturnCode::OK)
         );
 
         let mut destination: ffi::solClient_destination = ffi::solClient_destination {
@@ -217,8 +223,8 @@ impl SolSession {
             )
         };
         assert_eq!(
-            SolaceReturnCode::from_i32(set_destination_result),
-            Some(SolaceReturnCode::OK)
+            SolClientReturnCode::from_i32(set_destination_result),
+            Some(SolClientReturnCode::OK)
         );
 
         let c_message = CString::new(message.into()).expect("Invalid message");
@@ -226,15 +232,15 @@ impl SolSession {
         let set_attachment_result =
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
         assert_eq!(
-            SolaceReturnCode::from_i32(set_attachment_result),
-            Some(SolaceReturnCode::OK)
+            SolClientReturnCode::from_i32(set_attachment_result),
+            Some(SolClientReturnCode::OK)
         );
 
         let send_message_result =
             unsafe { ffi::solClient_session_sendMsg(self._session_pt, msg_ptr) };
         assert_eq!(
-            SolaceReturnCode::from_i32(send_message_result),
-            Some(SolaceReturnCode::OK)
+            SolClientReturnCode::from_i32(send_message_result),
+            Some(SolClientReturnCode::OK)
         );
 
         unsafe {
@@ -252,7 +258,7 @@ impl SolSession {
         let subscription_result =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolaceReturnCode::from_i32(subscription_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::OK) {
             return Err(SolaceError);
         }
         Ok(())
@@ -266,7 +272,7 @@ impl SolSession {
         let subscription_result =
             unsafe { ffi::solClient_session_topicUnsubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolaceReturnCode::from_i32(subscription_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::OK) {
             return Err(SolaceError);
         }
         Ok(())

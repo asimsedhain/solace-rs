@@ -1,8 +1,8 @@
 use std::fmt;
 pub mod context;
+mod message;
 pub mod session;
 mod solace;
-mod message;
 
 use enum_primitive::*;
 use solace::ffi;
@@ -34,7 +34,7 @@ enum_from_primitive! {
 enum_from_primitive! {
     #[derive(Debug, PartialEq)]
     #[repr(i32)]
-    pub enum SolaceReturnCode {
+    pub enum SolClientReturnCode {
         OK = ffi::solClient_returnCode_SOLCLIENT_OK,
         WouldBlock=ffi::solClient_returnCode_SOLCLIENT_WOULD_BLOCK,
         InProgress=ffi::solClient_returnCode_SOLCLIENT_IN_PROGRESS,

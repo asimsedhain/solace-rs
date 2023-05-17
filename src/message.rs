@@ -1,5 +1,5 @@
 use crate::solace::ffi;
-use crate::{Result, SolaceError, SolaceReturnCode};
+use crate::{Result, SolaceError, SolClientReturnCode};
 use num_traits::FromPrimitive;
 use std::convert::From;
 use std::ffi::CStr;
@@ -40,7 +40,7 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
 impl Drop for InboundMessage {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
-        if SolaceReturnCode::from_i32(msg_free_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::OK) {
             println!("warning: message was not dropped properly");
         }
     }
@@ -66,7 +66,7 @@ impl<'a> Message<'a> for InboundMessage {
             )
         };
 
-        if SolaceReturnCode::from_i32(msg_ops_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::OK) {
             println!("solace did not return ok; code: {}", msg_ops_result);
             return Err(SolaceError);
         }
@@ -88,7 +88,7 @@ impl<'a> Message<'a> for InboundMessage {
         let msg_ops_result =
             unsafe { ffi::solClient_msg_getBinaryAttachmentString(self.msg_ptr, &mut buffer) };
 
-        if SolaceReturnCode::from_i32(msg_ops_result) != Some(SolaceReturnCode::OK) {
+        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::OK) {
             println!("solace did not return ok");
             return Err(SolaceError);
         }
