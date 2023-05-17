@@ -149,14 +149,14 @@ impl SolSession {
             )
         };
 
-        if SolClientReturnCode::from_i32(session_create_result) != Some(SolClientReturnCode::OK) {
+        if SolClientReturnCode::from_i32(session_create_result) != Some(SolClientReturnCode::Ok) {
             panic!("Could not initialize solace session");
             //return Err(SolaceError);
         }
 
         let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
 
-        if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::OK) {
+        if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::Ok) {
             Ok(SolSession {
                 _session_pt: session_pt,
             })
@@ -199,7 +199,7 @@ impl SolSession {
         let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
         assert_eq!(
             SolClientReturnCode::from_i32(msg_alloc_result),
-            Some(SolClientReturnCode::OK)
+            Some(SolClientReturnCode::Ok)
         );
 
         let set_delivery_result = unsafe {
@@ -207,7 +207,7 @@ impl SolSession {
         };
         assert_eq!(
             SolClientReturnCode::from_i32(set_delivery_result),
-            Some(SolClientReturnCode::OK)
+            Some(SolClientReturnCode::Ok)
         );
 
         let mut destination: ffi::solClient_destination = ffi::solClient_destination {
@@ -224,7 +224,7 @@ impl SolSession {
         };
         assert_eq!(
             SolClientReturnCode::from_i32(set_destination_result),
-            Some(SolClientReturnCode::OK)
+            Some(SolClientReturnCode::Ok)
         );
 
         let c_message = CString::new(message.into()).expect("Invalid message");
@@ -233,14 +233,14 @@ impl SolSession {
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
         assert_eq!(
             SolClientReturnCode::from_i32(set_attachment_result),
-            Some(SolClientReturnCode::OK)
+            Some(SolClientReturnCode::Ok)
         );
 
         let send_message_result =
             unsafe { ffi::solClient_session_sendMsg(self._session_pt, msg_ptr) };
         assert_eq!(
             SolClientReturnCode::from_i32(send_message_result),
-            Some(SolClientReturnCode::OK)
+            Some(SolClientReturnCode::Ok)
         );
 
         unsafe {
@@ -258,7 +258,7 @@ impl SolSession {
         let subscription_result =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::OK) {
+        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
             return Err(SolaceError);
         }
         Ok(())
@@ -272,7 +272,7 @@ impl SolSession {
         let subscription_result =
             unsafe { ffi::solClient_session_topicUnsubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::OK) {
+        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
             return Err(SolaceError);
         }
         Ok(())

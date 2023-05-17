@@ -35,7 +35,7 @@ enum_from_primitive! {
     #[derive(Debug, PartialEq)]
     #[repr(i32)]
     pub enum SolClientReturnCode {
-        OK = ffi::solClient_returnCode_SOLCLIENT_OK,
+        Ok=ffi::solClient_returnCode_SOLCLIENT_OK,
         WouldBlock=ffi::solClient_returnCode_SOLCLIENT_WOULD_BLOCK,
         InProgress=ffi::solClient_returnCode_SOLCLIENT_IN_PROGRESS,
         NotReady=ffi::solClient_returnCode_SOLCLIENT_NOT_READY,
