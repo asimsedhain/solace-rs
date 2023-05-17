@@ -1,7 +1,7 @@
 use std::fmt;
 pub mod context;
 pub mod session;
-pub mod solace;
+mod solace;
 mod message;
 
 use enum_primitive::*;
