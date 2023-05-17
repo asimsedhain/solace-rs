@@ -6,6 +6,8 @@ use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString};
 use std::ptr;
 
+mod event;
+
 pub struct SolSession {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
