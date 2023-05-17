@@ -1,9 +1,9 @@
 use crate::context::SolContext;
-use crate::message::{InboundMessage, Message};
+use crate::message::InboundMessage;
 use crate::solace::ffi;
 use crate::{Result, SolaceError, SolaceReturnCode};
 use num_traits::FromPrimitive;
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
 use std::ptr;
 
 pub struct SolSession {
@@ -23,44 +23,41 @@ extern "C" fn on_event(
     println!("some event recienved");
 }
 
-extern "C" fn on_message(
-    opaque_session_p: ffi::solClient_opaqueSession_pt,
-    msg_p: ffi::solClient_opaqueMsg_pt,
-    user_p: *mut ::std::os::raw::c_void,
-) -> ffi::solClient_rxMsgCallback_returnCode_t {
-    println!("On message callback started");
+fn get_on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
+where
+    F: FnMut(InboundMessage) + Send + 'static,
+{
+    Some(static_on_message::<F>)
+}
 
-    println!("Printing using solace function");
-    unsafe {
-        ffi::solClient_msg_dump(msg_p, ptr::null_mut(), 0);
-    }
-    println!("Trying to duplicate message");
+extern "C" fn static_on_message<F>(
+    _opaque_session_p: ffi::solClient_opaqueSession_pt,
+    msg_p: ffi::solClient_opaqueMsg_pt,
+    raw_user_closure: *mut ::std::os::raw::c_void,
+) -> ffi::solClient_rxMsgCallback_returnCode_t
+where
+    // not completely sure if this is supposed to be FnMut or FnOnce
+    // threading takes in FnOnce - that is why I suspect it might be FnOnce.
+    // But not enough knowledge to make sure it is FnOnce.
+    F: FnMut(InboundMessage) + Send + 'static,
+{
+    // this function is glue code to allow users to pass in closures
+    // we duplicate the message pointer (which does not copy over the binary data)
+    // also this function will only be called from the context thread, so it should be thread safe
+    // as well
 
     let mut dup_msg_ptr = ptr::null_mut();
-
     unsafe { ffi::solClient_msg_dup(msg_p, &mut dup_msg_ptr) };
 
-    println!("Successfully called the dup func");
-
     let message = InboundMessage::from(dup_msg_ptr);
-
-    let payload = message.get_payload_as_bytes();
-    if let Ok(payload_bytes) = payload {
-        let message = std::str::from_utf8(payload_bytes);
-        if let Ok(str) = message {
-            println!("Printing from rust method \n {}", str);
-        } else {
-            println!("Invalid payload str");
-        }
-    } else {
-        println!("Could not print using rust method");
-    }
+    let user_closure = unsafe { &mut *(raw_user_closure as *mut F) };
+    user_closure(message);
 
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
 }
 
 impl SolSession {
-    pub fn new<H, V, U, P>(
+    pub fn new<H, V, U, P, F>(
         host_name: H,
         vpn_name: V,
         username: U,
@@ -68,7 +65,7 @@ impl SolSession {
         // since the solace_context has the threading library
         // might be good to get the context entirely instead of a reference to the context
         context: &SolContext,
-        //on_message: Fn,
+        on_message: Option<F>,
         //on_event: Fn,
     ) -> Result<Self>
     where
@@ -76,6 +73,7 @@ impl SolSession {
         V: Into<Vec<u8>>,
         U: Into<Vec<u8>>,
         P: Into<Vec<u8>>,
+        F: FnMut(InboundMessage) + Send + 'static,
     {
         /* Session */
         //solClient_opaqueSession_pt session_p;
@@ -107,6 +105,14 @@ impl SolSession {
 
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
+        let (static_on_message_callback, user_on_message) = match on_message {
+            Some(mut f) => (
+                get_on_message_trampoline(&f),
+                &mut f as *mut _ as *mut c_void,
+            ),
+            _ => (None, ptr::null_mut()),
+        };
+
         // Function information for Session creation.
         // The application must set the eventInfo callback information. All Sessions must have an event callback registered.
         let mut session_func_info: ffi::solClient_session_createFuncInfo_t =
@@ -120,8 +126,8 @@ impl SolSession {
                     user_p: ptr::null_mut(),
                 },
                 rxMsgInfo: ffi::solClient_session_createRxMsgCallbackFuncInfo {
-                    callback_p: Some(on_message),
-                    user_p: ptr::null_mut(),
+                    callback_p: static_on_message_callback,
+                    user_p: user_on_message,
                 },
             };
 
@@ -274,6 +280,7 @@ impl Drop for SolSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::message::Message;
     use crate::SolaceLogLevel;
     use std::thread::sleep;
     use std::time::Duration;
@@ -286,8 +293,14 @@ mod tests {
         let vpn_name = "default";
         let username = "default";
         let password = "";
-        let session_result =
-            SolSession::new(host_name, vpn_name, username, password, &solace_context);
+        let session_result = SolSession::new(
+            host_name,
+            vpn_name,
+            username,
+            password,
+            &solace_context,
+            None::<fn(_)>,
+        );
 
         let Ok(session) = session_result else{
             panic!();
@@ -328,8 +341,25 @@ mod tests {
         let vpn_name = "default";
         let username = "default";
         let password = "";
-        let session_result =
-            SolSession::new(host_name, vpn_name, username, password, &solace_context);
+        let on_message = |message: InboundMessage| {
+            if let Ok(payload) = message.get_payload_as_bytes() {
+                if let Ok(m) = std::str::from_utf8(payload) {
+                    println!("on_message handler got: {}", m);
+                } else {
+                    println!("on_message handler could not decode");
+                }
+            } else {
+                println!("on_message handler could not decode bytes");
+            }
+        };
+        let session_result = SolSession::new(
+            host_name,
+            vpn_name,
+            username,
+            password,
+            &solace_context,
+            Some(on_message),
+        );
 
         let Ok(session) = session_result else{
             panic!();
