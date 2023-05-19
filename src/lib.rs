@@ -7,6 +7,7 @@ mod event;
 
 use enum_primitive::*;
 use solace::ffi;
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct SolaceError;
@@ -49,3 +50,9 @@ enum_from_primitive! {
     }
 }
 
+
+#[derive(Error, Debug)]
+pub enum ContextError{
+    #[error("context thread failed to initialize")]
+    InitializationFailed,
+}

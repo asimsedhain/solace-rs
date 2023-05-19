@@ -1,7 +1,10 @@
 use crate::solace::ffi;
-use crate::{Result, SolaceLogLevel};
+use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
+use num_traits::FromPrimitive;
 use std::mem;
 use std::ptr;
+
+type Result<T> = std::result::Result<T, ContextError>;
 
 pub struct SolContext {
     // This pointer must never be allowed to leave the struct
@@ -16,9 +19,10 @@ impl SolContext {
         let solace_initailization_result =
             unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
 
-        if solace_initailization_result != ffi::solClient_returnCode_SOLCLIENT_OK {
-            panic!("Could not initialize solace client");
-            //return Err(SolaceError);
+        if SolClientReturnCode::from_i32(solace_initailization_result)
+            == Some(SolClientReturnCode::Ok)
+        {
+            return Err(ContextError::InitializationFailed);
         }
         let mut ctx: ffi::solClient_opaqueContext_pt = ptr::null_mut();
         let mut context_func: ffi::solClient_context_createFuncInfo_t =
@@ -38,9 +42,9 @@ impl SolContext {
                 mem::size_of::<ffi::solClient_context_createRegisterFdFuncInfo>(),
             )
         };
-        if solace_context_result != ffi::solClient_returnCode_SOLCLIENT_OK {
-            panic!("Could not initialize solace context");
-            //return Err(SolaceError);
+
+        if SolClientReturnCode::from_i32(solace_context_result) == Some(SolClientReturnCode::Ok) {
+            return Err(ContextError::InitializationFailed);
         }
         Ok(Self { _ctx: ctx })
     }
