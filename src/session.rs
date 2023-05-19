@@ -1,14 +1,18 @@
-mod utils;
+mod error;
+mod util;
 
 use crate::context::SolContext;
 use crate::event::SessionEvent;
 use crate::message::InboundMessage;
 use crate::solace::ffi;
-use crate::{Result, SolClientReturnCode, SolaceError};
+use crate::SolClientReturnCode;
+use error::SessionError;
 use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString};
 use std::ptr;
-use utils::{on_event_trampoline, on_message_trampoline};
+use util::{on_event_trampoline, on_message_trampoline};
+
+type Result<T> = std::result::Result<T, SessionError>;
 
 pub struct SolSession {
     // Pointer to session
@@ -41,10 +45,10 @@ impl SolSession {
         //solClient_session_createFuncInfo_t sessionFuncInfo = SOLCLIENT_SESSION_CREATEFUNC_INITIALIZER;
 
         // Converting props and storing them session props
-        let c_host_name = CString::new(host_name).expect("Invalid vpn_name");
-        let c_vpn_name = CString::new(vpn_name).expect("Invalid vpn_name");
-        let c_username = CString::new(username).expect("Invalid username");
-        let c_password = CString::new(password).expect("Invalid password");
+        let c_host_name = CString::new(host_name)?;
+        let c_vpn_name = CString::new(vpn_name)?;
+        let c_username = CString::new(username)?;
+        let c_password = CString::new(password)?;
 
         // Session props is a **char in C
         // it takes in an array of key and values
@@ -107,8 +111,7 @@ impl SolSession {
         };
 
         if SolClientReturnCode::from_i32(session_create_result) != Some(SolClientReturnCode::Ok) {
-            panic!("Could not initialize solace session");
-            //return Err(SolaceError);
+            return Err(SessionError::InitializationFailure);
         }
 
         let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
@@ -118,10 +121,7 @@ impl SolSession {
                 _session_pt: session_pt,
             })
         } else {
-            println!("Solace did not connect properly");
-            println!("Returned: {}", connection_result);
-
-            Err(SolaceError)
+            Err(SessionError::ConnectionFailure)
         }
     }
 
@@ -149,7 +149,7 @@ impl SolSession {
         // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
         //
 
-        let c_topic = CString::new(topic).expect("Invalid topic");
+        let c_topic = CString::new(topic)?;
 
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
 
@@ -184,7 +184,7 @@ impl SolSession {
             Some(SolClientReturnCode::Ok)
         );
 
-        let c_message = CString::new(message.into()).expect("Invalid message");
+        let c_message = CString::new(message.into())?;
 
         let set_attachment_result =
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
@@ -211,12 +211,14 @@ impl SolSession {
     where
         T: Into<Vec<u8>>,
     {
-        let c_topic = CString::new(topic).expect("Invalid topic");
+        let c_topic = CString::new(topic)?;
         let subscription_result =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
         if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SolaceError);
+            return Err(SessionError::SubscriptionFailure(
+                c_topic.to_string_lossy().into_owned(),
+            ));
         }
         Ok(())
     }
@@ -225,12 +227,14 @@ impl SolSession {
     where
         T: Into<Vec<u8>>,
     {
-        let c_topic = CString::new(topic).expect("Invalid topic");
+        let c_topic = CString::new(topic)?;
         let subscription_result =
             unsafe { ffi::solClient_session_topicUnsubscribe(self._session_pt, c_topic.as_ptr()) };
 
         if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SolaceError);
+            return Err(SessionError::UnsubscriptionFailure(
+                c_topic.to_string_lossy().into_owned(),
+            ));
         }
         Ok(())
     }
