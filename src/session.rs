@@ -1,12 +1,14 @@
+mod utils;
+
 use crate::context::SolContext;
+use crate::event::SessionEvent;
 use crate::message::InboundMessage;
 use crate::solace::ffi;
-use crate::{Result, SolaceError, SolClientReturnCode};
+use crate::{Result, SolClientReturnCode, SolaceError};
 use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString};
 use std::ptr;
-
-mod event;
+use utils::{on_event_trampoline, on_message_trampoline};
 
 pub struct SolSession {
     // Pointer to session
@@ -14,58 +16,8 @@ pub struct SolSession {
     pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
 }
 
-// TODO
-// These are temp callbacks
-// Implement callbacks that can be passed in
-extern "C" fn on_event(
-    opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
-    event_info_p: ffi::solClient_session_eventCallbackInfo_pt, //non-null
-    user_p: *mut ::std::os::raw::c_void,               // can be null
-) {
-    println!("some event recienved");
-}
-
-fn get_on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
-where
-    F: FnMut(InboundMessage) + Send + 'static,
-{
-    Some(static_on_message::<F>)
-}
-
-extern "C" fn static_on_message<F>(
-    _opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
-    msg_p: ffi::solClient_opaqueMsg_pt,                 // non-null
-    raw_user_closure: *mut ::std::os::raw::c_void,      // can be null
-) -> ffi::solClient_rxMsgCallback_returnCode_t
-where
-    // not completely sure if this is supposed to be FnMut or FnOnce
-    // threading takes in FnOnce - that is why I suspect it might be FnOnce.
-    // But not enough knowledge to make sure it is FnOnce.
-    F: FnMut(InboundMessage) + Send + 'static,
-{
-    // this function is glue code to allow users to pass in closures
-    // we duplicate the message pointer (which does not copy over the binary data)
-    // also this function will only be called from the context thread, so it should be thread safe
-    // as well
-
-    let non_null_raw_user_closure = std::ptr::NonNull::new(raw_user_closure);
-
-    let Some(raw_user_closure) =  non_null_raw_user_closure else{
-        return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
-    };
-
-    let mut dup_msg_ptr = ptr::null_mut();
-    unsafe { ffi::solClient_msg_dup(msg_p, &mut dup_msg_ptr) };
-
-    let message = InboundMessage::from(dup_msg_ptr);
-    let user_closure = unsafe { &mut *(raw_user_closure.as_ptr() as *mut F) };
-    user_closure(message);
-
-    ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
-}
-
 impl SolSession {
-    pub fn new<H, V, U, P, F>(
+    pub fn new<H, V, U, P, M, E>(
         host_name: H,
         vpn_name: V,
         username: U,
@@ -73,15 +25,16 @@ impl SolSession {
         // since the solace_context has the threading library
         // might be good to get the context entirely instead of a reference to the context
         context: &SolContext,
-        on_message: Option<F>,
-        //on_event: Fn,
+        on_message: Option<M>,
+        on_event: Option<E>,
     ) -> Result<Self>
     where
         H: Into<Vec<u8>>,
         V: Into<Vec<u8>>,
         U: Into<Vec<u8>>,
         P: Into<Vec<u8>>,
-        F: FnMut(InboundMessage) + Send + 'static,
+        M: FnMut(InboundMessage) + Send + 'static,
+        E: FnMut(SessionEvent) + Send + 'static,
     {
         /* Session */
         //solClient_opaqueSession_pt session_p;
@@ -114,10 +67,12 @@ impl SolSession {
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
         let (static_on_message_callback, user_on_message) = match on_message {
-            Some(mut f) => (
-                get_on_message_trampoline(&f),
-                &mut f as *mut _ as *mut c_void,
-            ),
+            Some(mut f) => (on_message_trampoline(&f), &mut f as *mut _ as *mut c_void),
+            _ => (None, ptr::null_mut()),
+        };
+
+        let (static_on_event_callback, user_on_event) = match on_event {
+            Some(mut f) => (on_event_trampoline(&f), &mut f as *mut _ as *mut c_void),
             _ => (None, ptr::null_mut()),
         };
 
@@ -130,8 +85,8 @@ impl SolSession {
                     user_p: ptr::null_mut(),
                 },
                 eventInfo: ffi::solClient_session_createEventCallbackFuncInfo {
-                    callback_p: Some(on_event),
-                    user_p: ptr::null_mut(),
+                    callback_p: static_on_event_callback,
+                    user_p: user_on_event,
                 },
                 rxMsgInfo: ffi::solClient_session_createRxMsgCallbackFuncInfo {
                     callback_p: static_on_message_callback,
@@ -308,6 +263,7 @@ mod tests {
             password,
             &solace_context,
             None::<fn(_)>,
+            None::<fn(_)>,
         );
 
         let Ok(session) = session_result else{
@@ -360,6 +316,10 @@ mod tests {
                 println!("on_message handler could not decode bytes");
             }
         };
+
+        let on_event = |e: SessionEvent| {
+            println!("on_event handler got: {}", e);
+        };
         let session_result = SolSession::new(
             host_name,
             vpn_name,
@@ -367,6 +327,7 @@ mod tests {
             password,
             &solace_context,
             Some(on_message),
+            Some(on_event),
         );
 
         let Ok(session) = session_result else{

@@ -3,6 +3,7 @@ pub mod context;
 mod message;
 pub mod session;
 mod solace;
+mod event;
 
 use enum_primitive::*;
 use solace::ffi;
