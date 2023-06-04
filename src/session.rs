@@ -186,6 +186,8 @@ impl SolSession {
 
         let c_message = CString::new(message.into())?;
 
+        // I thought we would have passed ownership to the c function
+        // but we are passing a reference to the c function instead
         let set_attachment_result =
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
         assert_eq!(
