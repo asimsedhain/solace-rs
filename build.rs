@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 fn main() {
     // Tell cargo to look for shared libraries in the specified directory
 
-
     //println!("cargo:rustc-link-search={}", solclient_dir);
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
@@ -42,24 +41,21 @@ fn main() {
         .unwrap()
         .to_string();
 
-    //// Tell cargo to link againts solace library
-    if  target == "aarch64-apple-darwin" {
+    // Tell cargo to link againts solace library
+    if target == "aarch64-apple-darwin" {
         println!("cargo:rustc-link-search=native={}", lib_dir);
 
-        // TODO
-        // there is some problem with the build system
-        // it looks for dynamic library with .dylib
-        // right now, I am manually copied the files to the /target/TARGET/deps folder
-        // might not work in the future
         println!("cargo:rustc-link-lib=dylib=crypto");
         println!("cargo:rustc-link-lib=dylib=ssl");
         println!("cargo:rustc-link-lib=dylib=solclient");
         println!("cargo:rustc-link-lib=dylib=solclientssl");
 
-        //println!("cargo:rustc-link-lib=static=crypto");
-        //println!("cargo:rustc-link-lib=static=ssl");
-        //println!("cargo:rustc-link-lib=static=solclient");
-        //println!("cargo:rustc-link-lib=static=solclientssl");
+        // the dynamic libraries needs to be in the DYLD_LIBRARY_PATH (LD_LIBRARY_PATHfor linux).
+        // The below will add the lib folder to the dylib path.
+        // this might not work when working others are using this library
+        // (previous note: this can be solved by manually copying the files in lib to
+        // /target/TARGET/deps folder)
+        println!("cargo:rustc-env=DYLD_FALLBACK_LIBRARY_PATH={}", lib_dir);
     } else {
         panic!("Unknown target {}", target)
     }
