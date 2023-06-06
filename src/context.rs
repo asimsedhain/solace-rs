@@ -20,7 +20,7 @@ impl SolContext {
             unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
 
         if SolClientReturnCode::from_i32(solace_initailization_result)
-            == Some(SolClientReturnCode::Ok)
+            != Some(SolClientReturnCode::Ok)
         {
             return Err(ContextError::InitializationFailed);
         }
@@ -43,7 +43,7 @@ impl SolContext {
             )
         };
 
-        if SolClientReturnCode::from_i32(solace_context_result) == Some(SolClientReturnCode::Ok) {
+        if SolClientReturnCode::from_i32(solace_context_result) != Some(SolClientReturnCode::Ok) {
             return Err(ContextError::InitializationFailed);
         }
         Ok(Self { _ctx: ctx })
