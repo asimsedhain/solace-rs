@@ -1,11 +1,24 @@
+pub mod inbound;
+pub mod outbound;
+
 use crate::solace::ffi;
-use crate::{Result, SolaceError, SolClientReturnCode};
-use num_traits::FromPrimitive;
-use std::convert::From;
+use crate::{Result, SolClientReturnCode, SolaceError};
+use enum_primitive::*;
+pub use inbound::InboundMessage;
+pub use outbound::{OutboundMessage, OutboundMessageBuilder};
 use std::ffi::CStr;
-use std::ops::Drop;
 use std::ptr;
 use std::time::SystemTime;
+
+enum_from_primitive! {
+    #[derive(Debug, PartialEq)]
+    #[repr(u32)]
+    pub enum DeliveryMode {
+        Direct=ffi::SOLCLIENT_DELIVERY_MODE_DIRECT,
+        Persistent=ffi::SOLCLIENT_DELIVERY_MODE_PERSISTENT,
+        NonPersistent=ffi::SOLCLIENT_DELIVERY_MODE_NONPERSISTENT
+    }
+}
 
 pub enum ClassOfServive {
     One,
@@ -14,44 +27,12 @@ pub enum ClassOfServive {
 }
 
 pub trait Message<'a> {
-    fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]>;
-    fn get_payload_as_str(&'a self) -> Result<&'a str>;
-    fn get_application_message_id(&'a self) -> Result<&'a str>;
-    fn get_application_message_type(&'a self) -> Result<&'a str>;
-    fn get_class_of_service(&'a self) -> Result<ClassOfServive>;
-    fn get_correlation_id(&'a self) -> Result<&'a str>;
-    fn get_expiration(&'a self) -> Result<SystemTime>;
-    fn get_priority(&'a self) -> Result<u8>;
-    fn get_sequence_number(&'a self) -> Result<i64>;
-}
-
-pub struct InboundMessage {
-    msg_ptr: ffi::solClient_opaqueMsg_pt,
-}
-
-impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
-    // From owned pointer
-    // InboundMessage will try to free the ptr when it is destroyed
-    fn from(ptr: ffi::solClient_opaqueMsg_pt) -> Self {
-        InboundMessage { msg_ptr: ptr }
-    }
-}
-
-impl Drop for InboundMessage {
-    fn drop(&mut self) {
-        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
-        if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
-            println!("warning: message was not dropped properly");
-        }
-    }
-}
-
-impl<'a> Message<'a> for InboundMessage {
     // so the problem right now is that, there is no documentaton on who owns the data
     // for the getting the data as bytes, the document reads like we do not own the data
     // for gettnig the data as string, it seems like we own it
     // for now, it might be best to assume we do not own data from any function.
     // and copy over anything we get
+    unsafe fn get_raw_message_ptr(&'a self) -> ffi::solClient_opaqueMsg_pt;
 
     fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]> {
         let mut buffer = ptr::null_mut();
@@ -60,7 +41,7 @@ impl<'a> Message<'a> for InboundMessage {
 
         let msg_ops_result = unsafe {
             ffi::solClient_msg_getBinaryAttachmentPtr(
-                self.msg_ptr,
+                self.get_raw_message_ptr(),
                 &mut buffer,
                 &mut buffer_len as *mut u32,
             )
@@ -85,8 +66,9 @@ impl<'a> Message<'a> for InboundMessage {
         let mut buffer = ptr::null();
 
         println!("pointing the buffer to the binary attachment");
-        let msg_ops_result =
-            unsafe { ffi::solClient_msg_getBinaryAttachmentString(self.msg_ptr, &mut buffer) };
+        let msg_ops_result = unsafe {
+            ffi::solClient_msg_getBinaryAttachmentString(self.get_raw_message_ptr(), &mut buffer)
+        };
 
         if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
             println!("solace did not return ok");
@@ -98,7 +80,6 @@ impl<'a> Message<'a> for InboundMessage {
         let c_str = unsafe { CStr::from_ptr(buffer) };
         return c_str.to_str().map_err(|_| SolaceError);
     }
-
     fn get_application_message_id(&'a self) -> Result<&'a str> {
         todo!()
     }

@@ -3,7 +3,9 @@ mod util;
 
 use crate::context::SolContext;
 use crate::event::SessionEvent;
-use crate::message::InboundMessage;
+use crate::message::{
+    DeliveryMode, InboundMessage, Message, OutboundMessage, OutboundMessageBuilder,
+};
 use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use error::SessionError;
@@ -125,86 +127,14 @@ impl SolSession {
         }
     }
 
-    pub fn publish<T, M>(&self, topic: T, message: M) -> Result<()>
-    where
-        M: Into<String>,
-        T: Into<Vec<u8>>,
-    {
-        // to accomplish the publishing,
-        // we will create a null_ptr
-        // allocate it using the provided function
-        // attach the destination to the ptr
-        // attach the message to the ptr
-        //
-        // for attaching the message to the ptr, we have a couple of options
-        // based on those options, we can create a couple of interfaces
-        //
-        // solClient_msg_setBinaryAttachmentPtr (solClient_opaqueMsg_pt msg_p, void *buf_p, solClient_uint32_t size)
-        // Given a msg_p, set the contents of a Binary Attachment Part to the given pointer and size.
-        //
-        // solClient_msg_setBinaryAttachment (solClient_opaqueMsg_pt msg_p, const void *buf_p, solClient_uint32_t size)
-        // Given a msg_p, set the contents of the binary attachment part by copying in from the given pointer and size.
-        //
-        // solClient_msg_setBinaryAttachmentString (solClient_opaqueMsg_pt msg_p, const char *buf_p)
-        // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
-        //
-
-        let c_topic = CString::new(topic)?;
-
-        let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
-
-        let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
-        assert_eq!(
-            SolClientReturnCode::from_i32(msg_alloc_result),
-            Some(SolClientReturnCode::Ok)
-        );
-
-        let set_delivery_result = unsafe {
-            ffi::solClient_msg_setDeliveryMode(msg_ptr, ffi::SOLCLIENT_DELIVERY_MODE_DIRECT)
+    pub fn publish(&self, message: OutboundMessage) -> Result<()> {
+        let send_message_result = unsafe {
+            ffi::solClient_session_sendMsg(self._session_pt, message.get_raw_message_ptr())
         };
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_delivery_result),
-            Some(SolClientReturnCode::Ok)
-        );
-
-        let mut destination: ffi::solClient_destination = ffi::solClient_destination {
-            destType: ffi::solClient_destinationType_SOLCLIENT_TOPIC_DESTINATION,
-            dest: c_topic.as_ptr(),
-        };
-
-        let set_destination_result = unsafe {
-            ffi::solClient_msg_setDestination(
-                msg_ptr,
-                &mut destination,
-                std::mem::size_of::<ffi::solClient_destination>(),
-            )
-        };
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_destination_result),
-            Some(SolClientReturnCode::Ok)
-        );
-
-        let c_message = CString::new(message.into())?;
-
-        // I thought we would have passed ownership to the c function
-        // but we are passing a reference to the c function instead
-        let set_attachment_result =
-            unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, c_message.as_ptr()) };
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_attachment_result),
-            Some(SolClientReturnCode::Ok)
-        );
-
-        let send_message_result =
-            unsafe { ffi::solClient_session_sendMsg(self._session_pt, msg_ptr) };
         assert_eq!(
             SolClientReturnCode::from_i32(send_message_result),
             Some(SolClientReturnCode::Ok)
         );
-
-        unsafe {
-            ffi::solClient_msg_free(&mut msg_ptr);
-        }
 
         Ok(())
     }
@@ -255,21 +185,36 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn it_works() {
+    fn it_subscribes_and_publishes() {
         let solace_context = SolContext::new(SolaceLogLevel::Warning).unwrap();
         println!("Context created");
         let host_name = "tcp://localhost:55554";
         let vpn_name = "default";
         let username = "default";
         let password = "";
+        let on_message = |message: InboundMessage| {
+            if let Ok(payload) = message.get_payload_as_bytes() {
+                if let Ok(m) = std::str::from_utf8(payload) {
+                    println!("on_message handler got: {}", m);
+                } else {
+                    println!("on_message handler could not decode");
+                }
+            } else {
+                println!("on_message handler could not decode bytes");
+            }
+        };
+
+        let on_event = |e: SessionEvent| {
+            println!("on_event handler got: {}", e);
+        };
         let session_result = SolSession::new(
             host_name,
             vpn_name,
             username,
             password,
             &solace_context,
-            None::<fn(_)>,
-            None::<fn(_)>,
+            Some(on_message),
+            Some(on_event),
         );
 
         let Ok(session) = session_result else{
@@ -287,9 +232,14 @@ mod tests {
         sleep(Duration::new(10, 0));
 
         for i in 0..10 {
-            session
-                .publish(topic, format!("hello from rust: {}", i))
-                .expect("message to be sent");
+            let mut builder = OutboundMessageBuilder::new();
+            builder.set_destination(topic).expect("could not set topic");
+            builder.set_delivery_mode(DeliveryMode::Direct);
+            builder
+                .set_binary_string(format!("hello from rust: {}", i))
+                .expect("chould not set string");
+            let message = builder.build().expect("could not build message");
+            session.publish(message).expect("message to be sent");
             sleep(Duration::new(1, 0));
         }
 
