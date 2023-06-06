@@ -3,9 +3,7 @@ mod util;
 
 use crate::context::SolContext;
 use crate::event::SessionEvent;
-use crate::message::{
-    DeliveryMode, InboundMessage, Message, OutboundMessage, OutboundMessageBuilder,
-};
+use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use error::SessionError;
@@ -179,15 +177,21 @@ impl Drop for SolSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::Message;
+    use crate::message::{DeliveryMode, Message, OutboundMessageBuilder};
     use crate::SolaceLogLevel;
     use std::thread::sleep;
     use std::time::Duration;
 
-    #[test]
-    fn it_subscribes_and_publishes() {
-        let solace_context = SolContext::new(SolaceLogLevel::Warning).unwrap();
+    fn create_print_session() -> Result<SolSession> {
+        /* utility function for creating basic printing sol session
+         * just prints the messages to stdout
+         */
+
+        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+            .map_err(|_| SessionError::InitializationFailure)?;
+
         println!("Context created");
+
         let host_name = "tcp://localhost:55554";
         let vpn_name = "default";
         let username = "default";
@@ -207,7 +211,7 @@ mod tests {
         let on_event = |e: SessionEvent| {
             println!("on_event handler got: {}", e);
         };
-        let session_result = SolSession::new(
+        SolSession::new(
             host_name,
             vpn_name,
             username,
@@ -215,18 +219,18 @@ mod tests {
             &solace_context,
             Some(on_message),
             Some(on_event),
-        );
+        )
+    }
 
-        let Ok(session) = session_result else{
-            panic!();
-        };
+    #[test]
+    fn it_subscribes_and_publishes() {
+        let session = create_print_session().unwrap();
+        println!("Session created");
 
         let topic = "try-me";
-        println!("Session created");
-        println!("Subscribing to {} topic", topic);
-
         let sub_result = session.subscribe(topic);
         assert!(sub_result.is_ok());
+        println!("Subscribed to {} topic", topic);
 
         println!("Sleeping for 10 secs before publishig messages",);
         sleep(Duration::new(10, 0));
@@ -243,67 +247,32 @@ mod tests {
             sleep(Duration::new(1, 0));
         }
 
-        let sleep_duration = Duration::new(30, 0);
-        println!("Sleeping for {:?}", sleep_duration);
+        let sleep_duration = Duration::new(10, 0);
+        println!("Sleeping for {:?} before exiting", sleep_duration);
         sleep(sleep_duration);
 
-        println!("Unsubscribing to {} topic", topic);
-
         let sub_result = session.unsubscribe(topic);
+        println!("Unsubscribed from {} topic", topic);
         assert!(sub_result.is_ok());
     }
 
     #[test]
     fn it_subscribes_and_listens() {
-        let solace_context = SolContext::new(SolaceLogLevel::Warning).unwrap();
-        println!("Context created");
-        let host_name = "tcp://localhost:55554";
-        let vpn_name = "default";
-        let username = "default";
-        let password = "";
-        let on_message = |message: InboundMessage| {
-            if let Ok(payload) = message.get_payload_as_bytes() {
-                if let Ok(m) = std::str::from_utf8(payload) {
-                    println!("on_message handler got: {}", m);
-                } else {
-                    println!("on_message handler could not decode");
-                }
-            } else {
-                println!("on_message handler could not decode bytes");
-            }
-        };
-
-        let on_event = |e: SessionEvent| {
-            println!("on_event handler got: {}", e);
-        };
-        let session_result = SolSession::new(
-            host_name,
-            vpn_name,
-            username,
-            password,
-            &solace_context,
-            Some(on_message),
-            Some(on_event),
-        );
-
-        let Ok(session) = session_result else{
-            panic!();
-        };
+        let session = create_print_session().unwrap();
 
         let topic = "try-me";
         println!("Session created");
-        println!("Subscribing to {} topic", topic);
 
         let sub_result = session.subscribe(topic);
         assert!(sub_result.is_ok());
+        println!("Subscribed to {} topic", topic);
 
         let sleep_duration = Duration::new(60, 0);
         println!("Sleeping for {:?}", sleep_duration);
         sleep(sleep_duration);
 
-        println!("Unsubscribing to {} topic", topic);
-
         let sub_result = session.unsubscribe(topic);
         assert!(sub_result.is_ok());
+        println!("Unsubscribed from {} topic", topic);
     }
 }
