@@ -1,12 +1,15 @@
+pub mod destination;
 pub mod inbound;
 pub mod outbound;
 
 use crate::solace::ffi;
 use crate::{Result, SolClientReturnCode, SolaceError};
+pub use destination::{DestinationType, MessageDestination};
 use enum_primitive::*;
 pub use inbound::InboundMessage;
 pub use outbound::{OutboundMessage, OutboundMessageBuilder};
 use std::ffi::CStr;
+use std::mem;
 use std::ptr;
 use std::time::SystemTime;
 
@@ -98,6 +101,24 @@ pub trait Message<'a> {
         todo!()
     }
     fn get_sequence_number(&'a self) -> Result<i64> {
+        todo!()
+    }
+    fn get_destination(&'a self) -> Result<&'a MessageDestination> {
+        let dest_ptr: *mut ffi::solClient_destination = ptr::null_mut();
+
+        let msg_ops_result = unsafe {
+            ffi::solClient_msg_getDestination(
+                self.get_raw_message_ptr(),
+                dest_ptr,
+                mem::size_of::<ffi::solClient_destination>(),
+            )
+        };
+
+        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
+            println!("solace did not return ok");
+            return Err(SolaceError);
+        }
+
         todo!()
     }
 }

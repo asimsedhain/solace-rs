@@ -145,6 +145,7 @@ impl SolSession {
         let subscription_result =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
+        println!("subscription_result: {}", subscription_result);
         if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
             return Err(SessionError::SubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),
@@ -177,7 +178,9 @@ impl Drop for SolSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::{DeliveryMode, Message, OutboundMessageBuilder};
+    use crate::message::{
+        DeliveryMode, DestinationType, Message, MessageDestination, OutboundMessageBuilder,
+    };
     use crate::SolaceLogLevel;
     use std::thread::sleep;
     use std::time::Duration;
@@ -218,6 +221,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn it_subscribes_and_publishes() {
         let solace_context = SolContext::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
@@ -228,6 +232,7 @@ mod tests {
 
         let topic = "try-me";
         let sub_result = session.subscribe(topic);
+        println!("sub result: {:?}", sub_result);
         assert!(sub_result.is_ok());
         println!("Subscribed to {} topic", topic);
 
@@ -235,13 +240,17 @@ mod tests {
         sleep(Duration::new(10, 0));
 
         for i in 0..10 {
-            let mut builder = OutboundMessageBuilder::new();
-            builder.set_destination(topic).expect("could not set topic");
-            builder.set_delivery_mode(DeliveryMode::Direct);
-            builder
-                .set_binary_string(format!("hello from rust: {}", i))
-                .expect("chould not set string");
-            let message = builder.build().expect("could not build message");
+            let message = {
+                let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
+
+                let builder = OutboundMessageBuilder::new()
+                    .set_destination(dest)
+                    .set_delivery_mode(DeliveryMode::Direct)
+                    .set_binary_string(format!("hello from rust: {}", i))
+                    .expect("chould not set string");
+
+                builder.build().expect("could not build message")
+            };
             session.publish(message).expect("message to be sent");
             sleep(Duration::new(1, 0));
         }
@@ -256,6 +265,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn it_subscribes_and_listens() {
         let solace_context = SolContext::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)

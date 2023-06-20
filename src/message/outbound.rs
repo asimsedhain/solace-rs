@@ -1,3 +1,4 @@
+use super::destination::MessageDestination;
 use super::{DeliveryMode, Message};
 use crate::solace::ffi;
 use crate::SolClientReturnCode;
@@ -35,7 +36,7 @@ impl<'a> Message<'a> for OutboundMessage {
 
 pub struct OutboundMessageBuilder {
     delivery_mode: Option<DeliveryMode>,
-    destination: Option<CString>,
+    destination: Option<MessageDestination>,
     message: Option<CString>,
 }
 
@@ -47,19 +48,18 @@ impl OutboundMessageBuilder {
             message: None,
         }
     }
-    pub fn set_delivery_mode(&mut self, mode: DeliveryMode) {
+    pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
         self.delivery_mode = Some(mode);
+
+        self
     }
 
-    pub fn set_destination<T>(&mut self, destination: T) -> Result<()>
-    where
-        T: Into<Vec<u8>>,
-    {
-        self.destination = Some(CString::new(destination)?);
-        Ok(())
+    pub fn set_destination(mut self, destination: MessageDestination) -> Self {
+        self.destination = Some(destination);
+        self
     }
 
-    pub fn set_binary_string<M>(&mut self, message: M) -> Result<()>
+    pub fn set_binary_string<M>(mut self, message: M) -> Result<Self>
     where
         M: Into<Vec<u8>>,
     {
@@ -76,7 +76,7 @@ impl OutboundMessageBuilder {
         // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
         //
         self.message = Some(CString::new(message)?);
-        Ok(())
+        Ok(self)
     }
 
     pub fn build(self) -> Result<OutboundMessage> {
@@ -103,9 +103,11 @@ impl OutboundMessageBuilder {
             panic!();
         };
 
+        // destination is being copied by solClient_msg_setDestination
+        // so it is fine to create a ptr for the destination.dest
         let mut destination: ffi::solClient_destination = ffi::solClient_destination {
-            destType: ffi::solClient_destinationType_SOLCLIENT_TOPIC_DESTINATION,
-            dest: destination.as_ptr(),
+            destType: destination.dest_type.to_i32(),
+            dest: destination.dest.as_ptr(),
         };
 
         let set_destination_result = unsafe {
@@ -134,5 +136,31 @@ impl OutboundMessageBuilder {
         );
 
         Ok(OutboundMessage { msg_ptr })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::{DestinationType, MessageDestination};
+
+    #[test]
+    fn it_should_build_message() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let _builder = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_binary_string("Hello");
+    }
+    #[test]
+    fn it_should_build_with_same_topic() {
+        // TODO
+        // complete this test
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let _message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .build()
+            .unwrap();
     }
 }
