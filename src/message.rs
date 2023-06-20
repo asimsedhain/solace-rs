@@ -37,7 +37,6 @@ pub trait Message<'a> {
     fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]> {
         let mut buffer = ptr::null_mut();
         let mut buffer_len: u32 = 0;
-        println!("pointing the buffer to the binary attachment");
 
         let msg_ops_result = unsafe {
             ffi::solClient_msg_getBinaryAttachmentPtr(

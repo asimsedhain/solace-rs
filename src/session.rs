@@ -182,15 +182,10 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
-    fn create_print_session() -> Result<SolSession> {
+    fn create_print_session(context: &SolContext) -> Result<SolSession> {
         /* utility function for creating basic printing sol session
          * just prints the messages to stdout
          */
-
-        let solace_context = SolContext::new(SolaceLogLevel::Warning)
-            .map_err(|_| SessionError::InitializationFailure)?;
-
-        println!("Context created");
 
         let host_name = "tcp://localhost:55554";
         let vpn_name = "default";
@@ -216,7 +211,7 @@ mod tests {
             vpn_name,
             username,
             password,
-            &solace_context,
+            context,
             Some(on_message),
             Some(on_event),
         )
@@ -224,7 +219,11 @@ mod tests {
 
     #[test]
     fn it_subscribes_and_publishes() {
-        let session = create_print_session().unwrap();
+        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+            .map_err(|_| SessionError::InitializationFailure)
+            .unwrap();
+        println!("Context created");
+        let session = create_print_session(&solace_context).unwrap();
         println!("Session created");
 
         let topic = "try-me";
@@ -258,7 +257,11 @@ mod tests {
 
     #[test]
     fn it_subscribes_and_listens() {
-        let session = create_print_session().unwrap();
+        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+            .map_err(|_| SessionError::InitializationFailure)
+            .unwrap();
+        println!("Context created");
+        let session = create_print_session(&solace_context).unwrap();
 
         let topic = "try-me";
         println!("Session created");
