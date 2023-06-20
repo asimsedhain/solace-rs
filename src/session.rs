@@ -9,18 +9,22 @@ use crate::SolClientReturnCode;
 use error::SessionError;
 use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString};
+use std::marker::PhantomData;
 use std::ptr;
 use util::{on_event_trampoline, on_message_trampoline};
 
 type Result<T> = std::result::Result<T, SessionError>;
 
-pub struct SolSession {
+pub struct SolSession<'a> {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
     pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
+    // phantomdata to tie context with session
+    // context needs to be alive for session to function
+    _phantom_context: PhantomData<&'a SolContext>,
 }
 
-impl SolSession {
+impl<'a> SolSession<'a> {
     pub fn new<H, V, U, P, M, E>(
         host_name: H,
         vpn_name: V,
@@ -28,7 +32,7 @@ impl SolSession {
         password: P,
         // since the solace_context has the threading library
         // might be good to get the context entirely instead of a reference to the context
-        context: &SolContext,
+        context: &'a SolContext,
         on_message: Option<M>,
         on_event: Option<E>,
     ) -> Result<Self>
@@ -119,6 +123,7 @@ impl SolSession {
         if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::Ok) {
             Ok(SolSession {
                 _session_pt: session_pt,
+                _phantom_context: PhantomData,
             })
         } else {
             Err(SessionError::ConnectionFailure)
@@ -171,7 +176,7 @@ impl SolSession {
     }
 }
 
-impl Drop for SolSession {
+impl<'a> Drop for SolSession<'a> {
     fn drop(&mut self) {}
 }
 
