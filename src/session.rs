@@ -57,6 +57,7 @@ impl<'a> SolSession<'a> {
         // Session props is a **char in C
         // it takes in an array of key and values
         // first we specify the key, then the value
+        // Session also copies over the props and maintains a copy internally.
         let session_props = [
             ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr(),
             c_host_name.as_ptr() as *const u8,
