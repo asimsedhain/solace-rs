@@ -41,6 +41,7 @@ pub struct OutboundMessageBuilder {
 }
 
 impl OutboundMessageBuilder {
+    /// Creates a new [`OutboundMessageBuilder`].
     pub fn new() -> Self {
         Self {
             delivery_mode: None,
@@ -136,6 +137,12 @@ impl OutboundMessageBuilder {
         );
 
         Ok(OutboundMessage { msg_ptr })
+    }
+}
+
+impl Default for OutboundMessageBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
