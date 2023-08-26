@@ -1,6 +1,6 @@
 use std::fmt;
 pub mod context;
-mod message;
+pub mod message;
 pub mod session;
 mod solace;
 mod event;
