@@ -62,7 +62,7 @@ pub trait Message<'a> {
 
     fn get_payload_as_str(&'a self) -> Result<&'a str> {
         // TODO
-        // this method might be broken
+        // this method is broken
         // fix and test
 
         let mut buffer = ptr::null();

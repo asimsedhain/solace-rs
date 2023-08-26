@@ -103,8 +103,6 @@ impl<'a> SolSession<'a> {
                 },
             };
 
-        // TODO
-        // needs to be fixed
         let session_create_result = unsafe {
             ffi::solClient_session_create(
                 session_props,
