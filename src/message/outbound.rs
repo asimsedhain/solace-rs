@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum MessageBuilderError {
     #[error("builder recieved invalid args")]
     InvalidArgs(#[from] NulError),
+    #[error("{0} arg need to be set")]
+    MissingArgs(String),
 }
 
 type Result<T> = std::result::Result<T, MessageBuilderError>;
@@ -90,7 +92,7 @@ impl OutboundMessageBuilder {
         );
 
         let Some(delivery_mode) = self.delivery_mode else{
-            panic!();
+            return Err(MessageBuilderError::MissingArgs("delivery_mode".to_owned()));
         };
 
         let set_delivery_result =
@@ -101,7 +103,7 @@ impl OutboundMessageBuilder {
         );
 
         let Some(destination) = self.destination else{
-            panic!();
+            return Err(MessageBuilderError::MissingArgs("destination".to_owned()));
         };
 
         // destination is being copied by solClient_msg_setDestination
@@ -127,7 +129,7 @@ impl OutboundMessageBuilder {
         // I thought we would have passed ownership to the c function
         // but we are passing a reference to the c function instead
         let Some(message) = self.message else{
-            panic!();
+            return Err(MessageBuilderError::MissingArgs("message".to_owned()));
         };
         let set_attachment_result =
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, message.as_ptr()) };

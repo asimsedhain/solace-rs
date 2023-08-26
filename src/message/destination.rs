@@ -6,9 +6,10 @@ use std::convert::From;
 use std::ffi::{CStr, CString};
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Default)]
     #[repr(i32)]
     pub enum DestinationType {
+        #[default]
         Null=ffi::solClient_destinationType_SOLCLIENT_NULL_DESTINATION,
         Topic=ffi::solClient_destinationType_SOLCLIENT_TOPIC_DESTINATION,
         Queue=ffi::solClient_destinationType_SOLCLIENT_QUEUE_DESTINATION,
@@ -53,11 +54,8 @@ impl MessageDestination {
 
 impl From<ffi::solClient_destination> for MessageDestination {
     fn from(raw_dest: ffi::solClient_destination) -> Self {
-        let Some(dest_type) = DestinationType::from_i32(raw_dest.destType) else{
-            // TODO
-            // replace this proper error handling
-            panic!();
-        };
+        let dest_type = DestinationType::from_i32(raw_dest.destType).unwrap_or_default();
+
         let dest_cstr = unsafe { CStr::from_ptr(raw_dest.dest) };
         let dest: CString = dest_cstr.into();
 

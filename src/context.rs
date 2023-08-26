@@ -54,10 +54,7 @@ impl Drop for SolContext {
     fn drop(&mut self) {
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
-            // TODO
-            // remove
-            // undefined behavior to panic in drop
-            panic!("Solace context did not drop properly");
+            println!("WARNING!! Solace context did not drop properly");
         }
     }
 }
