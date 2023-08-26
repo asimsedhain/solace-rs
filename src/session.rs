@@ -201,15 +201,24 @@ mod tests {
         let username = "default";
         let password = "";
         let on_message = |message: InboundMessage| {
-            if let Ok(payload) = message.get_payload_as_bytes() {
-                if let Ok(m) = std::str::from_utf8(payload) {
-                    println!("on_message handler got: {}", m);
-                } else {
-                    println!("on_message handler could not decode");
-                }
-            } else {
+            let Ok(payload) = message.get_payload_as_bytes() else{
                 println!("on_message handler could not decode bytes");
-            }
+                return;
+            };
+            let Ok(payload) = std::str::from_utf8(payload) else{
+                println!("on_message handler could not decode");
+                return
+            };
+            println!("on_message handler got: {}", payload);
+
+            let Ok(Some(dest)) = message.get_destination()else{
+                println!("on_message handler could not get destination");
+                return;
+            };
+            println!(
+                "on_message handler got message on: {:?} {:?}",
+                dest.dest_type, dest.dest
+            );
         };
 
         let on_event = |e: SessionEvent| {

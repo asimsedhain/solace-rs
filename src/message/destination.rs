@@ -2,7 +2,8 @@ use super::Result;
 use crate::solace::ffi;
 use crate::SolaceError;
 use enum_primitive::*;
-use std::ffi::CString;
+use std::convert::From;
+use std::ffi::{CStr, CString};
 
 enum_from_primitive! {
     #[derive(Debug, PartialEq)]
@@ -33,9 +34,10 @@ impl DestinationType {
 // then pass that as value to the message builder
 // but then also be able to get a MessageDestination from a message.
 // Right now, it seems the best way to do that is with by copying the meessage destination field.
+#[derive(Debug)]
 pub struct MessageDestination {
-    pub(super) dest_type: DestinationType,
-    pub(super) dest: CString,
+    pub dest_type: DestinationType,
+    pub dest: CString,
 }
 
 impl MessageDestination {
@@ -46,5 +48,19 @@ impl MessageDestination {
             dest_type,
             dest: c_destination,
         })
+    }
+}
+
+impl From<ffi::solClient_destination> for MessageDestination {
+    fn from(raw_dest: ffi::solClient_destination) -> Self {
+        let Some(dest_type) = DestinationType::from_i32(raw_dest.destType) else{
+            // TODO
+            // replace this proper error handling
+            panic!();
+        };
+        let dest_cstr = unsafe { CStr::from_ptr(raw_dest.dest) };
+        let dest: CString = dest_cstr.into();
+
+        MessageDestination { dest_type, dest }
     }
 }

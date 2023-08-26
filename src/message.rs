@@ -103,22 +103,31 @@ pub trait Message<'a> {
     fn get_sequence_number(&'a self) -> Result<i64> {
         todo!()
     }
-    fn get_destination(&'a self) -> Result<&'a MessageDestination> {
-        let dest_ptr: *mut ffi::solClient_destination = ptr::null_mut();
+
+    fn get_destination(&'a self) -> Result<Option<MessageDestination>> {
+        let mut dest_struct: ffi::solClient_destination = ffi::solClient_destination {
+            destType: ffi::solClient_destinationType_SOLCLIENT_NULL_DESTINATION,
+            dest: ptr::null_mut(),
+        };
 
         let msg_ops_result = unsafe {
             ffi::solClient_msg_getDestination(
                 self.get_raw_message_ptr(),
-                dest_ptr,
+                &mut dest_struct,
                 mem::size_of::<ffi::solClient_destination>(),
             )
         };
+        if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::NotFound) {
+            println!("destination was not found");
+            return Ok(None);
+        }
 
-        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
+        println!("message returned: {}", msg_ops_result);
+        if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::Fail) {
             println!("solace did not return ok");
             return Err(SolaceError);
         }
 
-        todo!()
+        Ok(Some(MessageDestination::from(dest_struct)))
     }
 }

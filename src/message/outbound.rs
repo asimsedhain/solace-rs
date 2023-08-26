@@ -159,15 +159,19 @@ mod tests {
             .set_destination(dest)
             .set_binary_string("Hello");
     }
+
     #[test]
     fn it_should_build_with_same_topic() {
-        // TODO
-        // complete this test
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
-        let _message = OutboundMessageBuilder::new()
+        let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
+            .set_binary_string("Hello")
+            .unwrap()
             .build()
             .unwrap();
+        let message_destination = message.get_destination().unwrap().unwrap();
+
+        assert!("test_topic" == message_destination.dest.to_string_lossy());
     }
 }
