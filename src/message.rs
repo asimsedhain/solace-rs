@@ -100,12 +100,36 @@ pub trait Message<'a> {
         return c_str.to_str().map_err(|_| SolaceError);
     }
 
-    fn get_application_message_id(&'a self) -> Result<&'a str> {
-        todo!()
+    fn get_application_message_id(&'a self) -> Option<&'a str> {
+        let mut buffer = ptr::null();
+
+        let op_result = unsafe {
+            ffi::solClient_msg_getApplicationMessageId(self.get_raw_message_ptr(), &mut buffer)
+        };
+
+        if SolClientReturnCode::from_i32(op_result) != Some(SolClientReturnCode::Ok) {
+            return None;
+        }
+
+        let c_str = unsafe { CStr::from_ptr(buffer) };
+
+        c_str.to_str().ok()
     }
 
-    fn get_application_message_type(&'a self) -> Result<&'a str> {
-        todo!()
+    fn get_application_msg_type(&'a self) -> Option<&'a str> {
+        let mut buffer = ptr::null();
+
+        let op_result = unsafe {
+            ffi::solClient_msg_getApplicationMsgType(self.get_raw_message_ptr(), &mut buffer)
+        };
+
+        if SolClientReturnCode::from_i32(op_result) != Some(SolClientReturnCode::Ok) {
+            return None;
+        }
+
+        let c_str = unsafe { CStr::from_ptr(buffer) };
+
+        c_str.to_str().ok()
     }
 
     fn get_class_of_service(&'a self) -> Result<ClassOfService> {

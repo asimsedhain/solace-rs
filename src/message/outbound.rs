@@ -49,6 +49,8 @@ pub struct OutboundMessageBuilder {
     class_of_service: Option<ClassOfService>,
     seq_number: Option<u64>,
     priority: Option<u8>,
+    application_id: Option<Vec<u8>>,
+    application_msg_type: Option<Vec<u8>>,
 }
 
 impl OutboundMessageBuilder {
@@ -58,6 +60,22 @@ impl OutboundMessageBuilder {
     }
     pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
         self.delivery_mode = Some(mode);
+        self
+    }
+
+    pub fn set_application_id<M>(mut self, application_id: M) -> Self
+    where
+        M: Into<Vec<u8>>,
+    {
+        self.application_id = Some(application_id.into());
+        self
+    }
+
+    pub fn set_application_msg_type<M>(mut self, message_type: M) -> Self
+    where
+        M: Into<Vec<u8>>,
+    {
+        self.application_msg_type = Some(message_type.into());
         self
     }
 
@@ -195,6 +213,25 @@ impl OutboundMessageBuilder {
             unsafe { ffi::solClient_msg_setPriority(msg_ptr, priority.into()) };
         }
 
+        // Application ID
+        if let Some(id) = self.application_id {
+            // application id is copied over
+            unsafe {
+                ffi::solClient_msg_setApplicationMessageId(msg_ptr, id.as_ptr() as *const i8)
+            };
+        }
+
+        // Application Message Type
+        if let Some(message_type) = self.application_msg_type {
+            // application msg type is copied over
+            unsafe {
+                ffi::solClient_msg_setApplicationMsgType(
+                    msg_ptr,
+                    message_type.as_ptr() as *const i8,
+                )
+            };
+        }
+
         Ok(OutboundMessage { msg_ptr })
     }
 }
@@ -314,5 +351,57 @@ mod tests {
             .unwrap();
 
         assert!(message.get_priority().unwrap().is_none());
+    }
+
+    #[test]
+    fn it_should_build_with_same_application_id() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_application_id("test_id")
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(Some("test_id") == message.get_application_message_id());
+
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(message.get_application_message_id().is_none());
+    }
+
+    #[test]
+    fn it_should_build_with_same_application_msg_type() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_application_msg_type("test_id")
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(Some("test_id") == message.get_application_msg_type());
+
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(message.get_application_msg_type().is_none());
     }
 }
