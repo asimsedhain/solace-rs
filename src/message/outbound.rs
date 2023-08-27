@@ -243,4 +243,19 @@ mod tests {
 
         assert!(0 == message.get_expiration());
     }
+
+    #[test]
+    fn it_should_build_with_same_cos() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_class_of_service(ClassOfService::Two)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(ClassOfService::Two == message.get_class_of_service().unwrap());
+    }
 }

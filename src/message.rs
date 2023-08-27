@@ -102,7 +102,19 @@ pub trait Message<'a> {
         todo!()
     }
     fn get_class_of_service(&'a self) -> Result<ClassOfService> {
-        todo!()
+        let mut cos: u32 = 0;
+        let cos_result =
+            unsafe { ffi::solClient_msg_getClassOfService(self.get_raw_message_ptr(), &mut cos) };
+
+        if SolClientReturnCode::from_i32(cos_result) != Some(SolClientReturnCode::Ok) {
+            return Err(SolaceError);
+        }
+
+        let Some(cos) = ClassOfService::from_u32(cos) else {
+            return Err(SolaceError);
+        };
+
+        Ok(cos)
     }
 
     fn get_correlation_id(&'a self) -> Result<&'a str> {
