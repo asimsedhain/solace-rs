@@ -18,8 +18,15 @@ impl Drop for InboundMessage {
 }
 
 impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
-    // From owned pointer
-    // InboundMessage will try to free the ptr when it is destroyed
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// From a valid owned pointer.
+    /// No other alias should exist for this pointer
+    /// InboundMessage will try to free the ptr when it is destroyed
+    ///
+    /// .
     fn from(ptr: ffi::solClient_opaqueMsg_pt) -> Self {
         Self { msg_ptr: ptr }
     }

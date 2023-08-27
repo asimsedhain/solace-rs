@@ -43,11 +43,15 @@ impl From<ClassOfService> for u32 {
 }
 
 pub trait Message<'a> {
-    // so the problem right now is that, there is no documentaton on who owns the data
-    // for the getting the data as bytes, the document reads like we do not own the data
-    // for gettnig the data as string, it seems like we own it
-    // for now, it might be best to assume we do not own data from any function.
-    // and copy over anything we get
+    /// .
+    ///
+    /// # Safety
+    ///
+    /// Should return ptr to a owned valid message.
+    /// No other alias for the ptr should exists.
+    /// Other methods will not check if the message is valid or not
+    ///
+    /// .
     unsafe fn get_raw_message_ptr(&'a self) -> ffi::solClient_opaqueMsg_pt;
 
     fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]> {
@@ -95,12 +99,15 @@ pub trait Message<'a> {
         let c_str = unsafe { CStr::from_ptr(buffer) };
         return c_str.to_str().map_err(|_| SolaceError);
     }
+
     fn get_application_message_id(&'a self) -> Result<&'a str> {
         todo!()
     }
+
     fn get_application_message_type(&'a self) -> Result<&'a str> {
         todo!()
     }
+
     fn get_class_of_service(&'a self) -> Result<ClassOfService> {
         let mut cos: u32 = 0;
         let cos_result =
@@ -130,12 +137,14 @@ pub trait Message<'a> {
         let c_str = unsafe { CStr::from_ptr(buffer) };
         return c_str.to_str().map_err(|_| SolaceError);
     }
+
     fn get_expiration(&'a self) -> i64 {
         let mut exp: i64 = 0;
         unsafe { ffi::solClient_msg_getExpiration(self.get_raw_message_ptr(), &mut exp) };
 
         exp
     }
+
     fn get_priority(&'a self) -> Result<Option<u8>> {
         let mut priority: i32 = 0;
         let op_result =
@@ -151,6 +160,7 @@ pub trait Message<'a> {
 
         Ok(Some(priority as u8))
     }
+
     fn get_sequence_number(&'a self) -> Result<Option<i64>> {
         let mut seq_num: i64 = 0;
         let op_result = unsafe {
