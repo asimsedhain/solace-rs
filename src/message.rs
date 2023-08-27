@@ -139,8 +139,16 @@ pub trait Message<'a> {
     fn get_priority(&'a self) -> Result<u8> {
         todo!()
     }
-    fn get_sequence_number(&'a self) -> Result<i64> {
-        todo!()
+    fn get_sequence_number(&'a self) -> Result<Option<i64>> {
+        let mut seq_num: i64 = 0;
+        let op_result = unsafe {
+            ffi::solClient_msg_getSequenceNumber(self.get_raw_message_ptr(), &mut seq_num)
+        };
+        match SolClientReturnCode::from_i32(op_result) {
+            Some(SolClientReturnCode::Ok) => Ok(Some(seq_num)),
+            Some(SolClientReturnCode::NotFound) => Ok(None),
+            _ => Err(SolaceError),
+        }
     }
 
     fn get_destination(&'a self) -> Result<Option<MessageDestination>> {

@@ -40,24 +40,20 @@ impl<'a> Message<'a> for OutboundMessage {
     }
 }
 
+#[derive(Default)]
 pub struct OutboundMessageBuilder {
     delivery_mode: Option<DeliveryMode>,
     destination: Option<MessageDestination>,
     message: Option<CString>,
     correlation_id: Option<CString>,
     class_of_service: Option<ClassOfService>,
+    seq_number: Option<u64>,
 }
 
 impl OutboundMessageBuilder {
     /// Creates a new [`OutboundMessageBuilder`].
     pub fn new() -> Self {
-        Self {
-            delivery_mode: None,
-            destination: None,
-            message: None,
-            correlation_id: None,
-            class_of_service: None,
-        }
+        Self::default()
     }
     pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
         self.delivery_mode = Some(mode);
@@ -71,6 +67,11 @@ impl OutboundMessageBuilder {
 
     pub fn set_class_of_service(mut self, cos: ClassOfService) -> Self {
         self.class_of_service = Some(cos);
+        self
+    }
+
+    pub fn set_seq_number(mut self, seq_num: u64) -> Self {
+        self.seq_number = Some(seq_num);
         self
     }
 
@@ -107,13 +108,14 @@ impl OutboundMessageBuilder {
     }
 
     pub fn build(self) -> Result<OutboundMessage> {
+        // message allocation
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
-
         let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(msg_alloc_result) else{
             return Err(MessageBuilderError::MessageAlocFailure);
         };
 
+        // delivery_mode
         let Some(delivery_mode) = self.delivery_mode else{
             return Err(MessageBuilderError::MissingArgs("delivery_mode".to_owned()));
         };
@@ -123,6 +125,7 @@ impl OutboundMessageBuilder {
             return Err(MessageBuilderError::SolClientError);
         };
 
+        // destination
         let Some(destination) = self.destination else{
             return Err(MessageBuilderError::MissingArgs("destination".to_owned()));
         };
@@ -143,6 +146,7 @@ impl OutboundMessageBuilder {
             return Err(MessageBuilderError::SolClientError);
         };
 
+        // binary attachment string
         // I thought we would have passed ownership to the c function
         // but we are passing a reference to the c function instead
         let Some(message) = self.message else{
@@ -155,6 +159,7 @@ impl OutboundMessageBuilder {
             return Err(MessageBuilderError::SolClientError);
         };
 
+        // correlation_id
         if let Some(id) = self.correlation_id {
             let set_correlation_id_result =
                 unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, id.as_ptr()) };
@@ -164,6 +169,7 @@ impl OutboundMessageBuilder {
             };
         }
 
+        // Class of Service
         if let Some(cos) = self.class_of_service {
             let set_cos_result =
                 unsafe { ffi::solClient_msg_setClassOfService(msg_ptr, cos.into()) };
@@ -173,13 +179,12 @@ impl OutboundMessageBuilder {
             };
         }
 
-        Ok(OutboundMessage { msg_ptr })
-    }
-}
+        // Sequence Number
+        if let Some(seq_number) = self.seq_number {
+            unsafe { ffi::solClient_msg_setSequenceNumber(msg_ptr, seq_number) };
+        }
 
-impl Default for OutboundMessageBuilder {
-    fn default() -> Self {
-        Self::new()
+        Ok(OutboundMessage { msg_ptr })
     }
 }
 
@@ -257,5 +262,20 @@ mod tests {
             .unwrap();
 
         assert!(ClassOfService::Two == message.get_class_of_service().unwrap());
+    }
+
+    #[test]
+    fn it_should_build_with_same_seq_num() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_seq_number(45)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(45 == message.get_sequence_number().unwrap().unwrap());
     }
 }
