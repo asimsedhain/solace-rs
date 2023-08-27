@@ -13,6 +13,10 @@ pub enum MessageBuilderError {
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
     MissingArgs(String),
+    #[error("solClient returned not ok code")]
+    SolClientError,
+    #[error("solClient message aloc failed")]
+    MessageAlocFailure,
 }
 
 type Result<T> = std::result::Result<T, MessageBuilderError>;
@@ -40,6 +44,7 @@ pub struct OutboundMessageBuilder {
     delivery_mode: Option<DeliveryMode>,
     destination: Option<MessageDestination>,
     message: Option<CString>,
+    correlation_id: Option<CString>,
 }
 
 impl OutboundMessageBuilder {
@@ -49,6 +54,7 @@ impl OutboundMessageBuilder {
             delivery_mode: None,
             destination: None,
             message: None,
+            correlation_id: None,
         }
     }
     pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
@@ -82,14 +88,25 @@ impl OutboundMessageBuilder {
         Ok(self)
     }
 
+    pub fn set_binary_payload<M: Into<Vec<u8>>>(self, _message: M) -> Result<Self> {
+        todo!();
+    }
+
+    pub fn set_correlation_id<M>(mut self, id: M) -> Result<Self>
+    where
+        M: Into<Vec<u8>>,
+    {
+        self.correlation_id = Some(CString::new(id)?);
+        Ok(self)
+    }
+
     pub fn build(self) -> Result<OutboundMessage> {
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
 
         let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
-        assert_eq!(
-            SolClientReturnCode::from_i32(msg_alloc_result),
-            Some(SolClientReturnCode::Ok)
-        );
+        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(msg_alloc_result) else{
+            return Err(MessageBuilderError::MessageAlocFailure);
+        };
 
         let Some(delivery_mode) = self.delivery_mode else{
             return Err(MessageBuilderError::MissingArgs("delivery_mode".to_owned()));
@@ -97,10 +114,10 @@ impl OutboundMessageBuilder {
 
         let set_delivery_result =
             unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_delivery_result),
-            Some(SolClientReturnCode::Ok)
-        );
+
+        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_delivery_result) else{
+            return Err(MessageBuilderError::SolClientError);
+        };
 
         let Some(destination) = self.destination else{
             return Err(MessageBuilderError::MissingArgs("destination".to_owned()));
@@ -121,10 +138,9 @@ impl OutboundMessageBuilder {
             )
         };
 
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_destination_result),
-            Some(SolClientReturnCode::Ok)
-        );
+        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_destination_result) else{
+            return Err(MessageBuilderError::SolClientError);
+        };
 
         // I thought we would have passed ownership to the c function
         // but we are passing a reference to the c function instead
@@ -133,10 +149,10 @@ impl OutboundMessageBuilder {
         };
         let set_attachment_result =
             unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, message.as_ptr()) };
-        assert_eq!(
-            SolClientReturnCode::from_i32(set_attachment_result),
-            Some(SolClientReturnCode::Ok)
-        );
+
+        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_attachment_result) else{
+            return Err(MessageBuilderError::SolClientError);
+        };
 
         Ok(OutboundMessage { msg_ptr })
     }
