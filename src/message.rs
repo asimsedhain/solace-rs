@@ -23,10 +23,24 @@ enum_from_primitive! {
     }
 }
 
-pub enum ClassOfServive {
-    One,
-    Two,
-    Three,
+enum_from_primitive! {
+    #[derive(Debug, PartialEq)]
+    #[repr(u32)]
+    pub enum ClassOfService {
+        One=ffi::SOLCLIENT_COS_1,
+        Two=ffi::SOLCLIENT_COS_2,
+        Three=ffi::SOLCLIENT_COS_3,
+    }
+}
+
+impl From<ClassOfService> for u32 {
+    fn from(val: ClassOfService) -> Self {
+        match val {
+            ClassOfService::One => ffi::SOLCLIENT_COS_1,
+            ClassOfService::Two => ffi::SOLCLIENT_COS_2,
+            ClassOfService::Three => ffi::SOLCLIENT_COS_3,
+        }
+    }
 }
 
 pub trait Message<'a> {
@@ -88,9 +102,10 @@ pub trait Message<'a> {
     fn get_application_message_type(&'a self) -> Result<&'a str> {
         todo!()
     }
-    fn get_class_of_service(&'a self) -> Result<ClassOfServive> {
+    fn get_class_of_service(&'a self) -> Result<ClassOfService> {
         todo!()
     }
+
     fn get_correlation_id(&'a self) -> Result<&'a str> {
         let mut buffer = ptr::null();
 

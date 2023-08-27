@@ -1,5 +1,5 @@
 use super::destination::MessageDestination;
-use super::{DeliveryMode, Message};
+use super::{ClassOfService, DeliveryMode, Message};
 use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
@@ -45,6 +45,7 @@ pub struct OutboundMessageBuilder {
     destination: Option<MessageDestination>,
     message: Option<CString>,
     correlation_id: Option<CString>,
+    class_of_service: Option<ClassOfService>,
 }
 
 impl OutboundMessageBuilder {
@@ -55,16 +56,21 @@ impl OutboundMessageBuilder {
             destination: None,
             message: None,
             correlation_id: None,
+            class_of_service: None,
         }
     }
     pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
         self.delivery_mode = Some(mode);
-
         self
     }
 
     pub fn set_destination(mut self, destination: MessageDestination) -> Self {
         self.destination = Some(destination);
+        self
+    }
+
+    pub fn set_class_of_service(mut self, cos: ClassOfService) -> Self {
+        self.class_of_service = Some(cos);
         self
     }
 
@@ -154,6 +160,15 @@ impl OutboundMessageBuilder {
                 unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, id.as_ptr()) };
 
             let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_correlation_id_result) else{
+                return Err(MessageBuilderError::SolClientError);
+            };
+        }
+
+        if let Some(cos) = self.class_of_service {
+            let set_cos_result =
+                unsafe { ffi::solClient_msg_setClassOfService(msg_ptr, cos.into()) };
+
+            if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_cos_result) {
                 return Err(MessageBuilderError::SolClientError);
             };
         }

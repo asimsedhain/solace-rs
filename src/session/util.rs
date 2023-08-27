@@ -1,7 +1,8 @@
+use num_traits::FromPrimitive;
+
 use crate::event::SessionEvent;
 use crate::message::InboundMessage;
 use crate::solace::ffi;
-use enum_primitive::*;
 use std::ptr;
 
 pub(super) fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
