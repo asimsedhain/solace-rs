@@ -48,6 +48,7 @@ pub struct OutboundMessageBuilder {
     correlation_id: Option<CString>,
     class_of_service: Option<ClassOfService>,
     seq_number: Option<u64>,
+    priority: Option<u8>,
 }
 
 impl OutboundMessageBuilder {
@@ -72,6 +73,11 @@ impl OutboundMessageBuilder {
 
     pub fn set_seq_number(mut self, seq_num: u64) -> Self {
         self.seq_number = Some(seq_num);
+        self
+    }
+
+    pub fn set_priority(mut self, priority: u8) -> Self {
+        self.priority = Some(priority);
         self
     }
 
@@ -184,6 +190,11 @@ impl OutboundMessageBuilder {
             unsafe { ffi::solClient_msg_setSequenceNumber(msg_ptr, seq_number) };
         }
 
+        // Priority
+        if let Some(priority) = self.priority {
+            unsafe { ffi::solClient_msg_setPriority(msg_ptr, priority.into()) };
+        }
+
         Ok(OutboundMessage { msg_ptr })
     }
 }
@@ -277,5 +288,31 @@ mod tests {
             .unwrap();
 
         assert!(45 == message.get_sequence_number().unwrap().unwrap());
+    }
+
+    #[test]
+    fn it_should_build_with_same_priority() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_priority(3)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(3 == message.get_priority().unwrap().unwrap());
+
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(message.get_priority().unwrap().is_none());
     }
 }

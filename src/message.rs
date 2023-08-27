@@ -136,8 +136,20 @@ pub trait Message<'a> {
 
         exp
     }
-    fn get_priority(&'a self) -> Result<u8> {
-        todo!()
+    fn get_priority(&'a self) -> Result<Option<u8>> {
+        let mut priority: i32 = 0;
+        let op_result =
+            unsafe { ffi::solClient_msg_getPriority(self.get_raw_message_ptr(), &mut priority) };
+
+        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(op_result) {
+            return Err(SolaceError);
+        }
+
+        if priority == -1 {
+            return Ok(None);
+        }
+
+        Ok(Some(priority as u8))
     }
     fn get_sequence_number(&'a self) -> Result<Option<i64>> {
         let mut seq_num: i64 = 0;
