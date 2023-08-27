@@ -256,13 +256,12 @@ mod tests {
             let message = {
                 let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
 
-                let builder = OutboundMessageBuilder::new()
+                OutboundMessageBuilder::new()
                     .set_destination(dest)
                     .set_delivery_mode(DeliveryMode::Direct)
                     .set_binary_string(format!("hello from rust: {}", i))
-                    .expect("chould not set string");
-
-                builder.build().expect("could not build message")
+                    .build()
+                    .expect("could not build message")
             };
             session.publish(message).expect("message to be sent");
             sleep(Duration::new(1, 0));

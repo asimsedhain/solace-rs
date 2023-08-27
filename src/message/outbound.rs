@@ -44,8 +44,8 @@ impl<'a> Message<'a> for OutboundMessage {
 pub struct OutboundMessageBuilder {
     delivery_mode: Option<DeliveryMode>,
     destination: Option<MessageDestination>,
-    message: Option<CString>,
-    correlation_id: Option<CString>,
+    message: Option<Vec<u8>>,
+    correlation_id: Option<Vec<u8>>,
     class_of_service: Option<ClassOfService>,
     seq_number: Option<u64>,
     priority: Option<u8>,
@@ -99,7 +99,7 @@ impl OutboundMessageBuilder {
         self
     }
 
-    pub fn set_binary_string<M>(mut self, message: M) -> Result<Self>
+    pub fn set_binary_string<M>(mut self, message: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -115,20 +115,21 @@ impl OutboundMessageBuilder {
         // solClient_msg_setBinaryAttachmentString (solClient_opaqueMsg_pt msg_p, const char *buf_p)
         // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
         //
-        self.message = Some(CString::new(message)?);
-        Ok(self)
+        self.message = Some(message.into());
+
+        self
     }
 
     pub fn set_binary_payload<M: Into<Vec<u8>>>(self, _message: M) -> Result<Self> {
         todo!();
     }
 
-    pub fn set_correlation_id<M>(mut self, id: M) -> Result<Self>
+    pub fn set_correlation_id<M>(mut self, id: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
-        self.correlation_id = Some(CString::new(id)?);
-        Ok(self)
+        self.correlation_id = Some(id.into());
+        self
     }
 
     pub fn build(self) -> Result<OutboundMessage> {
@@ -176,8 +177,9 @@ impl OutboundMessageBuilder {
         let Some(message) = self.message else{
             return Err(MessageBuilderError::MissingArgs("message".to_owned()));
         };
-        let set_attachment_result =
-            unsafe { ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, message.as_ptr()) };
+        let set_attachment_result = unsafe {
+            ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, CString::new(message)?.as_ptr())
+        };
 
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_attachment_result) else{
             return Err(MessageBuilderError::SolClientError);
@@ -186,7 +188,7 @@ impl OutboundMessageBuilder {
         // correlation_id
         if let Some(id) = self.correlation_id {
             let set_correlation_id_result =
-                unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, id.as_ptr()) };
+                unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
 
             let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_correlation_id_result) else{
                 return Err(MessageBuilderError::SolClientError);
@@ -257,7 +259,6 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
         let message_destination = message.get_destination().unwrap().unwrap();
@@ -272,9 +273,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_correlation_id("test_correlation")
-            .unwrap()
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -290,7 +289,6 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -305,7 +303,6 @@ mod tests {
             .set_destination(dest)
             .set_class_of_service(ClassOfService::Two)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -320,7 +317,6 @@ mod tests {
             .set_destination(dest)
             .set_seq_number(45)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -335,7 +331,6 @@ mod tests {
             .set_destination(dest)
             .set_priority(3)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -346,7 +341,6 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -361,7 +355,6 @@ mod tests {
             .set_destination(dest)
             .set_application_id("test_id")
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -372,7 +365,6 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -387,7 +379,6 @@ mod tests {
             .set_destination(dest)
             .set_application_msg_type("test_id")
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
@@ -398,7 +389,6 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_binary_string("Hello")
-            .unwrap()
             .build()
             .unwrap();
 
