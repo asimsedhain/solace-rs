@@ -229,4 +229,18 @@ mod tests {
 
         assert!("test_correlation" == correlation_id);
     }
+
+    #[test]
+    fn it_should_build_have_valid_exp() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(0 == message.get_expiration());
+    }
 }

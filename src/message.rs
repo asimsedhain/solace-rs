@@ -11,7 +11,6 @@ pub use outbound::{OutboundMessage, OutboundMessageBuilder};
 use std::ffi::CStr;
 use std::mem;
 use std::ptr;
-use std::time::SystemTime;
 
 enum_from_primitive! {
     #[derive(Debug, PartialEq)]
@@ -119,8 +118,11 @@ pub trait Message<'a> {
         let c_str = unsafe { CStr::from_ptr(buffer) };
         return c_str.to_str().map_err(|_| SolaceError);
     }
-    fn get_expiration(&'a self) -> Result<SystemTime> {
-        todo!()
+    fn get_expiration(&'a self) -> i64 {
+        let mut exp: i64 = 0;
+        unsafe { ffi::solClient_msg_getExpiration(self.get_raw_message_ptr(), &mut exp) };
+
+        exp
     }
     fn get_priority(&'a self) -> Result<u8> {
         todo!()
