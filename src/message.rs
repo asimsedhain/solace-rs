@@ -92,7 +92,17 @@ pub trait Message<'a> {
         todo!()
     }
     fn get_correlation_id(&'a self) -> Result<&'a str> {
-        todo!()
+        let mut buffer = ptr::null();
+
+        let msg_ops_result =
+            unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
+
+        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
+            return Err(SolaceError);
+        }
+
+        let c_str = unsafe { CStr::from_ptr(buffer) };
+        return c_str.to_str().map_err(|_| SolaceError);
     }
     fn get_expiration(&'a self) -> Result<SystemTime> {
         todo!()

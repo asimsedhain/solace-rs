@@ -111,10 +111,8 @@ impl OutboundMessageBuilder {
         let Some(delivery_mode) = self.delivery_mode else{
             return Err(MessageBuilderError::MissingArgs("delivery_mode".to_owned()));
         };
-
         let set_delivery_result =
             unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
-
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_delivery_result) else{
             return Err(MessageBuilderError::SolClientError);
         };
@@ -122,14 +120,12 @@ impl OutboundMessageBuilder {
         let Some(destination) = self.destination else{
             return Err(MessageBuilderError::MissingArgs("destination".to_owned()));
         };
-
         // destination is being copied by solClient_msg_setDestination
         // so it is fine to create a ptr for the destination.dest
         let mut destination: ffi::solClient_destination = ffi::solClient_destination {
             destType: destination.dest_type.to_i32(),
             dest: destination.dest.as_ptr(),
         };
-
         let set_destination_result = unsafe {
             ffi::solClient_msg_setDestination(
                 msg_ptr,
@@ -137,7 +133,6 @@ impl OutboundMessageBuilder {
                 std::mem::size_of::<ffi::solClient_destination>(),
             )
         };
-
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_destination_result) else{
             return Err(MessageBuilderError::SolClientError);
         };
@@ -153,6 +148,15 @@ impl OutboundMessageBuilder {
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_attachment_result) else{
             return Err(MessageBuilderError::SolClientError);
         };
+
+        if let Some(id) = self.correlation_id {
+            let set_correlation_id_result =
+                unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, id.as_ptr()) };
+
+            let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_correlation_id_result) else{
+                return Err(MessageBuilderError::SolClientError);
+            };
+        }
 
         Ok(OutboundMessage { msg_ptr })
     }
@@ -191,5 +195,23 @@ mod tests {
         let message_destination = message.get_destination().unwrap().unwrap();
 
         assert!("test_topic" == message_destination.dest.to_string_lossy());
+    }
+
+    #[test]
+    fn it_should_build_with_same_corralation_id() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_correlation_id("test_correlation")
+            .unwrap()
+            .set_binary_string("Hello")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let correlation_id = message.get_correlation_id().unwrap();
+
+        assert!("test_correlation" == correlation_id);
     }
 }
