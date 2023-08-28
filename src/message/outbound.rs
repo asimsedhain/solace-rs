@@ -58,12 +58,12 @@ impl OutboundMessageBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn set_delivery_mode(mut self, mode: DeliveryMode) -> Self {
+    pub fn delivery_mode(mut self, mode: DeliveryMode) -> Self {
         self.delivery_mode = Some(mode);
         self
     }
 
-    pub fn set_application_id<M>(mut self, application_id: M) -> Self
+    pub fn application_id<M>(mut self, application_id: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -71,7 +71,7 @@ impl OutboundMessageBuilder {
         self
     }
 
-    pub fn set_application_msg_type<M>(mut self, message_type: M) -> Self
+    pub fn application_msg_type<M>(mut self, message_type: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -79,27 +79,27 @@ impl OutboundMessageBuilder {
         self
     }
 
-    pub fn set_destination(mut self, destination: MessageDestination) -> Self {
+    pub fn destination(mut self, destination: MessageDestination) -> Self {
         self.destination = Some(destination);
         self
     }
 
-    pub fn set_class_of_service(mut self, cos: ClassOfService) -> Self {
+    pub fn class_of_service(mut self, cos: ClassOfService) -> Self {
         self.class_of_service = Some(cos);
         self
     }
 
-    pub fn set_seq_number(mut self, seq_num: u64) -> Self {
+    pub fn seq_number(mut self, seq_num: u64) -> Self {
         self.seq_number = Some(seq_num);
         self
     }
 
-    pub fn set_priority(mut self, priority: u8) -> Self {
+    pub fn priority(mut self, priority: u8) -> Self {
         self.priority = Some(priority);
         self
     }
 
-    pub fn set_payload<M>(mut self, message: M) -> Self
+    pub fn payload<M>(mut self, message: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -121,7 +121,7 @@ impl OutboundMessageBuilder {
         self
     }
 
-    pub fn set_correlation_id<M>(mut self, id: M) -> Self
+    pub fn correlation_id<M>(mut self, id: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -229,18 +229,18 @@ mod tests {
     fn it_should_build_message() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let _builder = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello");
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello");
     }
 
     #[test]
     fn it_should_build_with_same_topic() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
             .build()
             .unwrap();
         let message_destination = message.get_destination().unwrap().unwrap();
@@ -252,10 +252,10 @@ mod tests {
     fn it_should_build_with_same_corralation_id() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_correlation_id("test_correlation")
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .correlation_id("test_correlation")
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -268,9 +268,9 @@ mod tests {
     fn it_should_build_have_valid_exp() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -281,10 +281,10 @@ mod tests {
     fn it_should_build_with_same_cos() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_class_of_service(ClassOfService::Two)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .class_of_service(ClassOfService::Two)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -295,10 +295,10 @@ mod tests {
     fn it_should_build_with_same_seq_num() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_seq_number(45)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .seq_number(45)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -309,10 +309,10 @@ mod tests {
     fn it_should_build_with_same_priority() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_priority(3)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .priority(3)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -320,9 +320,9 @@ mod tests {
 
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -333,10 +333,10 @@ mod tests {
     fn it_should_build_with_same_application_id() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_application_id("test_id")
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .application_id("test_id")
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -344,9 +344,9 @@ mod tests {
 
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -357,10 +357,10 @@ mod tests {
     fn it_should_build_with_same_application_msg_type() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_application_msg_type("test_id")
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .application_msg_type("test_id")
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -368,9 +368,9 @@ mod tests {
 
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
             .build()
             .unwrap();
 
@@ -381,10 +381,10 @@ mod tests {
     fn it_should_build_with_same_string_payload() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
         let message = OutboundMessageBuilder::new()
-            .set_delivery_mode(DeliveryMode::Direct)
-            .set_destination(dest)
-            .set_application_msg_type("test_id")
-            .set_payload("Hello")
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .application_msg_type("test_id")
+            .payload("Hello")
             .build()
             .unwrap();
 

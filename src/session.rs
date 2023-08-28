@@ -257,9 +257,9 @@ mod tests {
                 let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
 
                 OutboundMessageBuilder::new()
-                    .set_destination(dest)
-                    .set_delivery_mode(DeliveryMode::Direct)
-                    .set_payload(format!("hello from rust: {}", i))
+                    .destination(dest)
+                    .delivery_mode(DeliveryMode::Direct)
+                    .payload(format!("hello from rust: {}", i))
                     .build()
                     .expect("could not build message")
             };
