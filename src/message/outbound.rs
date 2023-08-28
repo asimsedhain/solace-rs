@@ -12,7 +12,7 @@ pub enum MessageBuilderError {
     #[error("builder recieved invalid args")]
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
-    MissingArgs(String),
+    MissingRequiredArgs(String),
     #[error("solClient returned not ok code")]
     SolClientError,
     #[error("solClient message aloc failed")]
@@ -137,19 +137,18 @@ impl OutboundMessageBuilder {
             return Err(MessageBuilderError::MessageAlocFailure);
         };
 
+        // We do not check the return code for many of the setter functions since they only fail
+        // on invalid msg_ptr. We validated the message ptr above, so no need to double check.
+
         // delivery_mode
         let Some(delivery_mode) = self.delivery_mode else{
-            return Err(MessageBuilderError::MissingArgs("delivery_mode".to_owned()));
+            return Err(MessageBuilderError::MissingRequiredArgs("delivery_mode".to_owned()));
         };
-        let set_delivery_result =
-            unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
-        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_delivery_result) {
-            return Err(MessageBuilderError::SolClientError);
-        };
+        unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
 
         // destination
         let Some(destination) = self.destination else{
-            return Err(MessageBuilderError::MissingArgs("destination".to_owned()));
+            return Err(MessageBuilderError::MissingRequiredArgs("destination".to_owned()));
         };
         // destination is being copied by solClient_msg_setDestination
         // so it is fine to create a ptr for the destination.dest
@@ -157,54 +156,35 @@ impl OutboundMessageBuilder {
             destType: destination.dest_type.to_i32(),
             dest: destination.dest.as_ptr(),
         };
-        let set_destination_result = unsafe {
+        unsafe {
             ffi::solClient_msg_setDestination(
                 msg_ptr,
                 &mut destination,
                 std::mem::size_of::<ffi::solClient_destination>(),
             )
         };
-        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_destination_result) {
-            return Err(MessageBuilderError::SolClientError);
-        };
 
         // binary attachment string
         // We pass the ptr which is then copied over
         let Some(message) = self.message else{
-            return Err(MessageBuilderError::MissingArgs("message".to_owned()));
+            return Err(MessageBuilderError::MissingRequiredArgs("message".to_owned()));
         };
-
-        let set_attachment_result = unsafe {
+        unsafe {
             ffi::solClient_msg_setBinaryAttachment(
                 msg_ptr,
                 message.as_ptr() as *const c_void,
                 message.len() as u32,
             )
         };
-        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_attachment_result) {
-            return Err(MessageBuilderError::SolClientError);
-        };
 
         // correlation_id
         if let Some(id) = self.correlation_id {
-            let set_correlation_id_result =
-                unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
-
-            if Some(SolClientReturnCode::Ok)
-                != SolClientReturnCode::from_i32(set_correlation_id_result)
-            {
-                return Err(MessageBuilderError::SolClientError);
-            };
+            unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
         }
 
         // Class of Service
         if let Some(cos) = self.class_of_service {
-            let set_cos_result =
-                unsafe { ffi::solClient_msg_setClassOfService(msg_ptr, cos.into()) };
-
-            if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_cos_result) {
-                return Err(MessageBuilderError::SolClientError);
-            };
+            unsafe { ffi::solClient_msg_setClassOfService(msg_ptr, cos.into()) };
         }
 
         // Sequence Number
