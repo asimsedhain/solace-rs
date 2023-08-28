@@ -149,7 +149,6 @@ impl<'a> SolSession<'a> {
         let subscription_result =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        println!("subscription_result: {}", subscription_result);
         if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
             return Err(SessionError::SubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),

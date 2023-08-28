@@ -187,13 +187,10 @@ pub trait Message<'a> {
             )
         };
         if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::NotFound) {
-            println!("destination was not found");
             return Ok(None);
         }
 
-        println!("message returned: {}", msg_ops_result);
         if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::Fail) {
-            println!("solace did not return ok");
             return Err(SolaceError);
         }
 
