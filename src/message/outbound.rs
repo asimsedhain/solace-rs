@@ -133,7 +133,7 @@ impl OutboundMessageBuilder {
         // message allocation
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
         let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
-        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(msg_alloc_result) else{
+        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(msg_alloc_result) {
             return Err(MessageBuilderError::MessageAlocFailure);
         };
 
@@ -143,7 +143,7 @@ impl OutboundMessageBuilder {
         };
         let set_delivery_result =
             unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
-        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_delivery_result) else{
+        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_delivery_result) {
             return Err(MessageBuilderError::SolClientError);
         };
 
@@ -164,7 +164,7 @@ impl OutboundMessageBuilder {
                 std::mem::size_of::<ffi::solClient_destination>(),
             )
         };
-        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_destination_result) else{
+        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_destination_result) {
             return Err(MessageBuilderError::SolClientError);
         };
 
@@ -181,7 +181,7 @@ impl OutboundMessageBuilder {
                 message.len() as u32,
             )
         };
-        let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_attachment_result) else{
+        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(set_attachment_result) {
             return Err(MessageBuilderError::SolClientError);
         };
 
@@ -190,7 +190,9 @@ impl OutboundMessageBuilder {
             let set_correlation_id_result =
                 unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
 
-            let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_correlation_id_result) else{
+            if Some(SolClientReturnCode::Ok)
+                != SolClientReturnCode::from_i32(set_correlation_id_result)
+            {
                 return Err(MessageBuilderError::SolClientError);
             };
         }
