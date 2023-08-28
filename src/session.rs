@@ -199,7 +199,7 @@ mod tests {
         let username = "default";
         let password = "";
         let on_message = |message: InboundMessage| {
-            let Ok(payload) = message.get_payload_as_bytes() else{
+            let Ok(payload) = message.get_payload() else{
                 println!("on_message handler could not decode bytes");
                 return;
             };
@@ -259,7 +259,7 @@ mod tests {
                 OutboundMessageBuilder::new()
                     .set_destination(dest)
                     .set_delivery_mode(DeliveryMode::Direct)
-                    .set_binary_string(format!("hello from rust: {}", i))
+                    .set_payload(format!("hello from rust: {}", i))
                     .build()
                     .expect("could not build message")
             };

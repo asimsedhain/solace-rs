@@ -3,7 +3,7 @@ use super::{ClassOfService, DeliveryMode, Message};
 use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
-use std::ffi::{CString, NulError};
+use std::ffi::{c_void, CString, NulError};
 use std::ptr;
 use thiserror::Error;
 
@@ -99,7 +99,7 @@ impl OutboundMessageBuilder {
         self
     }
 
-    pub fn set_binary_string<M>(mut self, message: M) -> Self
+    pub fn set_payload<M>(mut self, message: M) -> Self
     where
         M: Into<Vec<u8>>,
     {
@@ -115,13 +115,10 @@ impl OutboundMessageBuilder {
         // solClient_msg_setBinaryAttachmentString (solClient_opaqueMsg_pt msg_p, const char *buf_p)
         // Given a msg_p, set the contents of the binary attachment part to a UTF-8 or ASCII string by copying in from the given pointer until null-terminated.
         //
+        // we will only use the binary ptr methods
         self.message = Some(message.into());
 
         self
-    }
-
-    pub fn set_binary_payload<M: Into<Vec<u8>>>(self, _message: M) -> Result<Self> {
-        todo!();
     }
 
     pub fn set_correlation_id<M>(mut self, id: M) -> Self
@@ -172,15 +169,18 @@ impl OutboundMessageBuilder {
         };
 
         // binary attachment string
-        // I thought we would have passed ownership to the c function
-        // but we are passing a reference to the c function instead
+        // We pass the ptr which is then copied over
         let Some(message) = self.message else{
             return Err(MessageBuilderError::MissingArgs("message".to_owned()));
         };
-        let set_attachment_result = unsafe {
-            ffi::solClient_msg_setBinaryAttachmentString(msg_ptr, CString::new(message)?.as_ptr())
-        };
 
+        let set_attachment_result = unsafe {
+            ffi::solClient_msg_setBinaryAttachment(
+                msg_ptr,
+                message.as_ptr() as *const c_void,
+                message.len() as u32,
+            )
+        };
         let Some(SolClientReturnCode::Ok) = SolClientReturnCode::from_i32(set_attachment_result) else{
             return Err(MessageBuilderError::SolClientError);
         };
@@ -249,7 +249,7 @@ mod tests {
         let _builder = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello");
+            .set_payload("Hello");
     }
 
     #[test]
@@ -258,7 +258,7 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
         let message_destination = message.get_destination().unwrap().unwrap();
@@ -273,7 +273,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_correlation_id("test_correlation")
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -288,7 +288,7 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -302,7 +302,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_class_of_service(ClassOfService::Two)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -316,7 +316,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_seq_number(45)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -330,7 +330,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_priority(3)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -340,7 +340,7 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -354,7 +354,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_application_id("test_id")
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -364,7 +364,7 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -378,7 +378,7 @@ mod tests {
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
             .set_application_msg_type("test_id")
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
@@ -388,10 +388,26 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .set_delivery_mode(DeliveryMode::Direct)
             .set_destination(dest)
-            .set_binary_string("Hello")
+            .set_payload("Hello")
             .build()
             .unwrap();
 
         assert!(message.get_application_msg_type().is_none());
+    }
+
+    #[test]
+    fn it_should_build_with_same_string_payload() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .set_delivery_mode(DeliveryMode::Direct)
+            .set_destination(dest)
+            .set_application_msg_type("test_id")
+            .set_payload("Hello")
+            .build()
+            .unwrap();
+
+        let raw_payload = message.get_payload().unwrap();
+
+        assert!(b"Hello" == raw_payload);
     }
 }

@@ -54,7 +54,7 @@ pub trait Message<'a> {
     /// .
     unsafe fn get_raw_message_ptr(&'a self) -> ffi::solClient_opaqueMsg_pt;
 
-    fn get_payload_as_bytes(&'a self) -> Result<&'a [u8]> {
+    fn get_payload(&'a self) -> Result<&'a [u8]> {
         let mut buffer = ptr::null_mut();
         let mut buffer_len: u32 = 0;
 
@@ -62,12 +62,11 @@ pub trait Message<'a> {
             ffi::solClient_msg_getBinaryAttachmentPtr(
                 self.get_raw_message_ptr(),
                 &mut buffer,
-                &mut buffer_len as *mut u32,
+                &mut buffer_len,
             )
         };
 
         if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
-            println!("solace did not return ok; code: {}", msg_ops_result);
             return Err(SolaceError);
         }
         let buf_len = buffer_len.try_into().unwrap();
@@ -75,29 +74,6 @@ pub trait Message<'a> {
         let safe_slice = unsafe { std::slice::from_raw_parts(buffer as *const u8, buf_len) };
 
         Ok(safe_slice)
-    }
-
-    fn get_payload_as_str(&'a self) -> Result<&'a str> {
-        // TODO
-        // this method is broken
-        // fix and test
-
-        let mut buffer = ptr::null();
-
-        println!("pointing the buffer to the binary attachment");
-        let msg_ops_result = unsafe {
-            ffi::solClient_msg_getBinaryAttachmentString(self.get_raw_message_ptr(), &mut buffer)
-        };
-
-        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
-            println!("solace did not return ok");
-            return Err(SolaceError);
-        }
-
-        println!("successfully pointed the buffer to the binary attachment");
-
-        let c_str = unsafe { CStr::from_ptr(buffer) };
-        return c_str.to_str().map_err(|_| SolaceError);
     }
 
     fn get_application_message_id(&'a self) -> Option<&'a str> {
