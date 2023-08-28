@@ -3,6 +3,7 @@ use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use enum_primitive::*;
 use std::convert::From;
+use std::time::SystemTime;
 
 pub struct InboundMessage {
     msg_ptr: ffi::solClient_opaqueMsg_pt,
@@ -35,5 +36,23 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
 impl<'a> Message<'a> for InboundMessage {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
         self.msg_ptr
+    }
+}
+
+impl InboundMessage {
+    pub fn get_receive_timestamp(&self) -> SystemTime {
+        todo!()
+    }
+
+    pub fn get_sender_timestamp(&self) -> SystemTime {
+        todo!()
+    }
+
+    pub fn get_sender_id(&self) -> String {
+        todo!()
+    }
+
+    pub fn is_discard_indication(&self) -> bool {
+        todo!()
     }
 }
