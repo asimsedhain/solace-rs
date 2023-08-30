@@ -6,7 +6,7 @@ use std::ptr;
 
 type Result<T> = std::result::Result<T, ContextError>;
 
-pub struct SolContext {
+pub struct RawContext {
     // This pointer must never be allowed to leave the struct
     pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
@@ -14,7 +14,7 @@ pub struct SolContext {
 // Solace initializes global variables
 // as such it is not safe to have multiple solaces libraries
 // in the same project
-impl SolContext {
+impl RawContext {
     pub fn new(log_level: SolaceLogLevel) -> Result<Self> {
         let solace_initailization_result =
             unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
@@ -50,7 +50,7 @@ impl SolContext {
     }
 }
 
-impl Drop for SolContext {
+impl Drop for RawContext {
     fn drop(&mut self) {
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {

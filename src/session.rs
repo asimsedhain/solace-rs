@@ -1,7 +1,7 @@
 mod error;
 mod util;
 
-use crate::context::SolContext;
+use crate::context::RawContext;
 use crate::event::SessionEvent;
 use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::solace::ffi;
@@ -21,7 +21,7 @@ pub struct SolSession<'a> {
     pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
     // phantomdata to tie context with session
     // context needs to be alive for session to function
-    _phantom_context: PhantomData<&'a SolContext>,
+    _phantom_context: PhantomData<&'a RawContext>,
 }
 
 impl<'a> SolSession<'a> {
@@ -32,7 +32,7 @@ impl<'a> SolSession<'a> {
         password: P,
         // since the solace_context has the threading library
         // might be good to get the context entirely instead of a reference to the context
-        context: &'a SolContext,
+        context: &'a RawContext,
         on_message: Option<M>,
         on_event: Option<E>,
     ) -> Result<Self>
@@ -115,7 +115,7 @@ impl<'a> SolSession<'a> {
         let session_create_result = unsafe {
             ffi::solClient_session_create(
                 session_props,
-                context._ctx,
+                context.ctx,
                 &mut session_pt,
                 &mut session_func_info,
                 std::mem::size_of::<ffi::solClient_session_createFuncInfo_t>(),
@@ -198,7 +198,7 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
-    fn create_print_session(context: &SolContext) -> Result<SolSession> {
+    fn create_print_session(context: &RawContext) -> Result<SolSession> {
         /* utility function for creating basic printing sol session
          * just prints the messages to stdout
          */
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_publishes() {
-        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+        let solace_context = RawContext::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_listens() {
-        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+        let solace_context = RawContext::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_moves_local_variable_into_closure() {
-        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+        let solace_context = RawContext::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
