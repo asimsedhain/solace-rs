@@ -75,13 +75,22 @@ impl<'a> SolSession<'a> {
 
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
+        // Box::into_raw(Box::new(Box::new(f))) as *mut _
+        // leaks memory
+        // but without it, causes seg fault
         let (static_on_message_callback, user_on_message) = match on_message {
-            Some(mut f) => (on_message_trampoline(&f), &mut f as *mut _ as *mut c_void),
+            Some(f) => (
+                on_message_trampoline(&f),
+                Box::into_raw(Box::new(Box::new(f))) as *mut _,
+            ),
             _ => (None, ptr::null_mut()),
         };
 
         let (static_on_event_callback, user_on_event) = match on_event {
-            Some(mut f) => (on_event_trampoline(&f), &mut f as *mut _ as *mut c_void),
+            Some(f) => (
+                on_event_trampoline(&f),
+                Box::into_raw(Box::new(Box::new(f))) as *mut _,
+            ),
             _ => (None, ptr::null_mut()),
         };
 
@@ -185,6 +194,7 @@ mod tests {
         DeliveryMode, DestinationType, Message, MessageDestination, OutboundMessageBuilder,
     };
     use crate::SolaceLogLevel;
+    use std::sync::{Arc, Mutex};
     use std::thread::sleep;
     use std::time::Duration;
 
@@ -297,6 +307,66 @@ mod tests {
 
         let sub_result = session.unsubscribe(topic);
         assert!(sub_result.is_ok());
+        println!("Unsubscribed from {} topic", topic);
+    }
+
+    #[test]
+    #[ignore]
+    fn it_subscribes_and_moves_local_variable_into_closure() {
+        let solace_context = SolContext::new(SolaceLogLevel::Warning)
+            .map_err(|_| SessionError::InitializationFailure)
+            .unwrap();
+        println!("Context created");
+
+        let host_name = "tcp://localhost:55554";
+        let vpn_name = "default";
+        let username = "default";
+        let password = "";
+
+        let buffer = Arc::new(Mutex::new(vec!["Hello".to_string()]));
+        let buf_copy = buffer.clone();
+        //let mut buffe = 0;
+
+        let on_message = move |message: InboundMessage| {
+            println!("Got message: {:?}", message.get_payload());
+            //buffe += 1;
+            //println!("adding 1 to buf {}", buffe);
+            if let Ok(mut buf) = buf_copy.lock() {
+                buf.push("Hello".to_string());
+
+                println!("Got into the lock {:?}", buf_copy);
+            }
+        };
+
+        let on_event = |e: SessionEvent| {
+            println!("on_event handler got: {}", e);
+        };
+        let session = SolSession::new(
+            host_name,
+            vpn_name,
+            username,
+            password,
+            &solace_context,
+            Some(on_message),
+            Some(on_event),
+        )
+        .expect("Could not create session");
+
+        let topic = "try-me";
+        println!("Session created");
+
+        session
+            .subscribe(topic)
+            .expect("Could not subscribe to topic");
+        println!("Subscribed to {} topic", topic);
+
+        let sleep_duration = Duration::new(60, 0);
+        println!("Sleeping for {:?}", sleep_duration);
+        sleep(sleep_duration);
+
+        session
+            .unsubscribe(topic)
+            .expect("Could not unsubscribe to topic");
         println!("Unsubscribed from {} topic", topic);
     }
 }
