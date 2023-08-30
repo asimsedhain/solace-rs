@@ -8,7 +8,7 @@ type Result<T> = std::result::Result<T, ContextError>;
 
 pub struct SolContext {
     // This pointer must never be allowed to leave the struct
-    pub(crate) _ctx: ffi::solClient_opaqueContext_pt,
+    pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
 
 // Solace initializes global variables
@@ -46,7 +46,7 @@ impl SolContext {
         if SolClientReturnCode::from_i32(solace_context_result) != Some(SolClientReturnCode::Ok) {
             return Err(ContextError::InitializationFailed);
         }
-        Ok(Self { _ctx: ctx })
+        Ok(Self { ctx })
     }
 }
 
