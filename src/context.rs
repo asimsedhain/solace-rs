@@ -11,11 +11,18 @@ pub struct RawContext {
     pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
 
-// Solace initializes global variables
-// as such it is not safe to have multiple solaces libraries
-// in the same project
 impl RawContext {
-    pub fn new(log_level: SolaceLogLevel) -> Result<Self> {
+    /// .
+    /// Raw solace context that wraps around the c context
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if .
+    ///
+    /// # Safety
+    /// Context initializes global variables so it is not safe to have multiple solace contexts.
+    /// .
+    pub unsafe fn new(log_level: SolaceLogLevel) -> Result<Self> {
         let solace_initailization_result =
             unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
 

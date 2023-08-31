@@ -5,37 +5,47 @@ use crate::context::RawContext;
 use crate::event::SessionEvent;
 use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::solace::ffi;
-use crate::SolClientReturnCode;
+use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use error::SessionError;
 use num_traits::FromPrimitive;
-use std::ffi::{c_void, CString};
-use std::marker::PhantomData;
+use std::ffi::CString;
 use std::ptr;
+use std::sync::Arc;
 use util::{on_event_trampoline, on_message_trampoline};
 
 type Result<T> = std::result::Result<T, SessionError>;
 
-pub struct SolSession<'a> {
-    // Pointer to session
-    // This pointer must never be allowed to leave the struct
-    pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
-    // phantomdata to tie context with session
-    // context needs to be alive for session to function
-    _phantom_context: PhantomData<&'a RawContext>,
+/// Handle for a Solace context, used to create sessions.
+///
+/// It is thread safe, and can be safely cloned and shared. Each clone
+/// references the same underlying C context. Internally, an `Arc` is
+/// used to implement this in a threadsafe way.
+///
+/// Also note that this binding deviates from the C API in that each
+/// session created from a context initially owns a clone of that
+/// context.
+///
+#[derive(Clone)]
+pub struct Context {
+    raw: Arc<RawContext>,
 }
 
-impl<'a> SolSession<'a> {
-    pub fn new<H, V, U, P, M, E>(
+impl Context {
+    pub fn new(log_level: SolaceLogLevel) -> std::result::Result<Self, ContextError> {
+        Ok(Self {
+            raw: Arc::new(unsafe { RawContext::new(log_level) }?),
+        })
+    }
+
+    pub fn session<H, V, U, P, M, E>(
+        &self,
         host_name: H,
         vpn_name: V,
         username: U,
         password: P,
-        // since the solace_context has the threading library
-        // might be good to get the context entirely instead of a reference to the context
-        context: &'a RawContext,
         on_message: Option<M>,
         on_event: Option<E>,
-    ) -> Result<Self>
+    ) -> Result<SolSession>
     where
         H: Into<Vec<u8>>,
         V: Into<Vec<u8>>,
@@ -115,7 +125,7 @@ impl<'a> SolSession<'a> {
         let session_create_result = unsafe {
             ffi::solClient_session_create(
                 session_props,
-                context.ctx,
+                self.raw.ctx,
                 &mut session_pt,
                 &mut session_func_info,
                 std::mem::size_of::<ffi::solClient_session_createFuncInfo_t>(),
@@ -131,13 +141,28 @@ impl<'a> SolSession<'a> {
         if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::Ok) {
             Ok(SolSession {
                 _session_pt: session_pt,
-                _phantom_context: PhantomData,
+                context: self.clone(),
             })
         } else {
             Err(SessionError::ConnectionFailure)
         }
     }
+}
 
+pub struct SolSession {
+    // Pointer to session
+    // This pointer must never be allowed to leave the struct
+    pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
+    // The `context` field is never accessed, but implicitly does
+    // reference counting via the `Drop` trait.
+    #[allow(dead_code)]
+    context: Context,
+}
+
+unsafe impl Send for SolSession {}
+unsafe impl Sync for SolSession {}
+
+impl SolSession {
     pub fn publish(&self, message: OutboundMessage) -> Result<()> {
         let send_message_result = unsafe {
             ffi::solClient_session_sendMsg(self._session_pt, message.get_raw_message_ptr())
@@ -183,7 +208,7 @@ impl<'a> SolSession<'a> {
     }
 }
 
-impl<'a> Drop for SolSession<'a> {
+impl Drop for SolSession {
     fn drop(&mut self) {}
 }
 
@@ -198,7 +223,7 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
-    fn create_print_session(context: &RawContext) -> Result<SolSession> {
+    fn create_print_session(context: &Context) -> Result<SolSession> {
         /* utility function for creating basic printing sol session
          * just prints the messages to stdout
          */
@@ -231,12 +256,11 @@ mod tests {
         let on_event = |e: SessionEvent| {
             println!("on_event handler got: {}", e);
         };
-        SolSession::new(
+        context.session(
             host_name,
             vpn_name,
             username,
             password,
-            context,
             Some(on_message),
             Some(on_event),
         )
@@ -245,7 +269,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_publishes() {
-        let solace_context = RawContext::new(SolaceLogLevel::Warning)
+        let solace_context = Context::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
@@ -288,7 +312,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_listens() {
-        let solace_context = RawContext::new(SolaceLogLevel::Warning)
+        let solace_context = Context::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
@@ -313,7 +337,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_moves_local_variable_into_closure() {
-        let solace_context = RawContext::new(SolaceLogLevel::Warning)
+        let solace_context = Context::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
@@ -325,32 +349,36 @@ mod tests {
 
         let buffer = Arc::new(Mutex::new(vec!["Hello".to_string()]));
         let buf_copy = buffer.clone();
-        //let mut buffe = 0;
 
         let on_message = move |message: InboundMessage| {
-            println!("Got message: {:?}", message.get_payload());
-            //buffe += 1;
-            //println!("adding 1 to buf {}", buffe);
-            if let Ok(mut buf) = buf_copy.lock() {
-                buf.push("Hello".to_string());
+            let Ok(payload) = message.get_payload()else {
+                return;
+            };
+            let Ok(payload) = std::str::from_utf8(payload)else{
+                return;
+            };
 
-                println!("Got into the lock {:?}", buf_copy);
+            println!("Got message: {:?}", payload);
+            if let Ok(mut buf) = buf_copy.lock() {
+                buf.push(payload.to_string());
+
+                println!("Got into the lock {:?}", buf);
             }
         };
 
         let on_event = |e: SessionEvent| {
             println!("on_event handler got: {}", e);
         };
-        let session = SolSession::new(
-            host_name,
-            vpn_name,
-            username,
-            password,
-            &solace_context,
-            Some(on_message),
-            Some(on_event),
-        )
-        .expect("Could not create session");
+        let session = solace_context
+            .session(
+                host_name,
+                vpn_name,
+                username,
+                password,
+                Some(on_message),
+                Some(on_event),
+            )
+            .expect("Could not create session");
 
         let topic = "try-me";
         println!("Session created");
