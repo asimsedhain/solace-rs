@@ -1,12 +1,12 @@
-use std::fmt;
 pub mod context;
+pub mod event;
 pub mod message;
 pub mod session;
 mod solace;
-mod event;
 
 use enum_primitive::*;
 use solace::ffi;
+use std::fmt;
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -50,9 +50,8 @@ enum_from_primitive! {
     }
 }
 
-
 #[derive(Error, Debug)]
-pub enum ContextError{
+pub enum ContextError {
     #[error("context thread failed to initialize")]
     InitializationFailed,
 }
