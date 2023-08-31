@@ -219,7 +219,7 @@ mod tests {
         DeliveryMode, DestinationType, Message, MessageDestination, OutboundMessageBuilder,
     };
     use crate::SolaceLogLevel;
-    use std::sync::{Arc, Mutex};
+    use std::sync::mpsc;
     use std::thread::sleep;
     use std::time::Duration;
 
@@ -336,65 +336,50 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn it_subscribes_and_moves_local_variable_into_closure() {
+    fn it_subscribes_and_listen_over_channel() {
         let solace_context = Context::new(SolaceLogLevel::Warning)
             .map_err(|_| SessionError::InitializationFailure)
             .unwrap();
         println!("Context created");
 
-        let host_name = "tcp://localhost:55554";
-        let vpn_name = "default";
-        let username = "default";
-        let password = "";
-
-        let buffer = Arc::new(Mutex::new(vec!["Hello".to_string()]));
-        let buf_copy = buffer.clone();
+        let (tx, rx) = mpsc::channel();
 
         let on_message = move |message: InboundMessage| {
             let Ok(payload) = message.get_payload()else {
                 return;
             };
-            let Ok(payload) = std::str::from_utf8(payload)else{
-                return;
-            };
-
-            println!("Got message: {:?}", payload);
-            if let Ok(mut buf) = buf_copy.lock() {
-                buf.push(payload.to_string());
-
-                println!("Got into the lock {:?}", buf);
-            }
+            println!("Got message, sending it over the channel");
+            let _ = tx.send(payload.to_owned());
         };
 
-        let on_event = |e: SessionEvent| {
-            println!("on_event handler got: {}", e);
-        };
         let session = solace_context
             .session(
-                host_name,
-                vpn_name,
-                username,
-                password,
+                "tcp://localhost:55554",
+                "default",
+                "default",
+                "",
                 Some(on_message),
-                Some(on_event),
+                Some(|e: SessionEvent| {
+                    println!("on_event handler got: {}", e);
+                }),
             )
             .expect("Could not create session");
 
-        let topic = "try-me";
-        println!("Session created");
-
         session
-            .subscribe(topic)
+            .subscribe("try-me")
             .expect("Could not subscribe to topic");
-        println!("Subscribed to {} topic", topic);
+        println!("Subscribed to try-me topic");
 
-        let sleep_duration = Duration::new(60, 0);
-        println!("Sleeping for {:?}", sleep_duration);
-        sleep(sleep_duration);
+        while let Ok(msg) = rx.recv() {
+            let Ok(payload) = std::str::from_utf8(&msg)else{
+                break;
+            };
+            println!("Got on channel: {}", payload);
+        }
 
         session
-            .unsubscribe(topic)
+            .unsubscribe("try-me")
             .expect("Could not unsubscribe to topic");
-        println!("Unsubscribed from {} topic", topic);
+        println!("Unsubscribed from try-me topic");
     }
 }
