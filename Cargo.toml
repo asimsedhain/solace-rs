@@ -2,6 +2,21 @@
 name = "libsolace"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+keywords = ["solace", "messaging"]
+include = ["/src", "Cargo.toml", "README.md"]
+readme = "README.md"
+
+repository = "https://github.com/asimsedhain/solace-rs"
+homepage = "https://github.com/asimsedhain/solace-rs"
+documentation = "https://github.com/asimsedhain/solace-rs"
+
+description = """
+The Unofficial Solace PubSub+ Rust Client Library.
+It can be used to access the services of a Solace PubSub+ Event Broker.
+This is a wrapper around the Solace C library. Use under your own risk!
+The C library is not included.
+"""
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
