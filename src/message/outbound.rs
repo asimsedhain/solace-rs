@@ -1,6 +1,6 @@
 use super::destination::MessageDestination;
 use super::{ClassOfService, DeliveryMode, Message};
-use solace_sys as ffi;
+use solace_rs_sys as ffi;
 use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
 use std::ffi::{c_void, CString, NulError};

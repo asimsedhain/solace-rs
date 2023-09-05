@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 
 use crate::event::SessionEvent;
 use crate::message::InboundMessage;
-use solace_sys as ffi;
+use solace_rs_sys as ffi;
 use std::{mem, ptr};
 
 pub(super) fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t

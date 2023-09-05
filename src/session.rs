@@ -7,7 +7,7 @@ use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use error::SessionError;
 use num_traits::FromPrimitive;
-use solace_sys as ffi;
+use solace_rs_sys as ffi;
 use std::ffi::CString;
 use std::ptr;
 use std::sync::Arc;

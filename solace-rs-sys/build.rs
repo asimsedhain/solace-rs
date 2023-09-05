@@ -23,15 +23,15 @@ fn main() {
         }
     }
 
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let solclient_folder_name = "solclient-7.26.1.8";
-    let solclient_folder_path = manifest_dir.join(solclient_folder_name);
+    let solclient_folder_path = out_dir.join(solclient_folder_name);
 
     let solclient_tarball_url = format!(
         "https://github.com/asimsedhain/solace-rs/releases/download/0.0.0.0/{SOLCLIENT_GZ_PATH}"
     );
 
-    let solclient_tarball_path = manifest_dir.join(format!("{solclient_folder_name}.tar.gz"));
+    let solclient_tarball_path = out_dir.join(format!("{solclient_folder_name}.tar.gz"));
 
     if !solclient_tarball_path.is_file() {
         let resp = reqwest::blocking::get(solclient_tarball_url).unwrap();

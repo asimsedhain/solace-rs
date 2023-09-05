@@ -4,7 +4,7 @@ pub mod message;
 pub mod session;
 
 use enum_primitive::*;
-use solace_sys as ffi;
+use solace_rs_sys as ffi;
 use std::fmt;
 use thiserror::Error;
 

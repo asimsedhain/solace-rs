@@ -1,6 +1,6 @@
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use num_traits::FromPrimitive;
-use solace_sys as ffi;
+use solace_rs_sys as ffi;
 use std::mem;
 use std::ptr;
 
@@ -43,8 +43,8 @@ impl RawContext {
 
         // enable context thread
         let mut conext_props: [*const i8; 3] = [
-            solace_sys::SOLCLIENT_CONTEXT_PROP_CREATE_THREAD.as_ptr() as *const i8,
-            solace_sys::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
+            solace_rs_sys::SOLCLIENT_CONTEXT_PROP_CREATE_THREAD.as_ptr() as *const i8,
+            solace_rs_sys::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
             ptr::null(),
         ];
 
