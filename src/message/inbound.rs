@@ -1,7 +1,7 @@
 use super::Message;
-use crate::solace::ffi;
 use crate::SolClientReturnCode;
 use enum_primitive::*;
+use solace_sys as ffi;
 use std::convert::From;
 use std::time::SystemTime;
 

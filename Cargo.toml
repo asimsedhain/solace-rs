@@ -1,11 +1,11 @@
 [package]
-name = "libsolace"
+name = "solace-rs"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 keywords = ["solace", "messaging"]
-include = ["/src", "Cargo.toml", "README.md"]
 readme = "README.md"
+authors = ["Ashim Sedhain <asimsedhain33@gmail.com>"]
 
 repository = "https://github.com/asimsedhain/solace-rs"
 homepage = "https://github.com/asimsedhain/solace-rs"
@@ -24,7 +24,5 @@ The C library is not included.
 enum_primitive = "0.1.1"
 num-traits = "0.2.15"
 thiserror = "1.0.40"
+solace-sys = { path = "./solace-sys" }
 
-
-[build-dependencies]
-bindgen = "0.65.1"

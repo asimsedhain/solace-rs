@@ -2,10 +2,9 @@ pub mod context;
 pub mod event;
 pub mod message;
 pub mod session;
-mod solace;
 
 use enum_primitive::*;
-use solace::ffi;
+use solace_sys as ffi;
 use std::fmt;
 use thiserror::Error;
 

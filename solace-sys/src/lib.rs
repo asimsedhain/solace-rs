@@ -3,7 +3,4 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-pub mod ffi {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
-
+include!("solace_binding.rs");

@@ -1,7 +1,7 @@
 use super::Result;
-use crate::solace::ffi;
 use crate::SolaceError;
 use enum_primitive::*;
+use solace_sys as ffi;
 use std::convert::From;
 use std::ffi::{CStr, CString};
 

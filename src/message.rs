@@ -2,7 +2,7 @@ pub mod destination;
 pub mod inbound;
 pub mod outbound;
 
-use crate::solace::ffi;
+use solace_sys as ffi;
 use crate::{Result, SolClientReturnCode, SolaceError};
 pub use destination::{DestinationType, MessageDestination};
 use enum_primitive::*;

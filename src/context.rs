@@ -1,6 +1,6 @@
-use crate::solace::ffi;
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use num_traits::FromPrimitive;
+use solace_sys as ffi;
 use std::mem;
 use std::ptr;
 
@@ -43,7 +43,7 @@ impl RawContext {
 
         let solace_context_result = unsafe {
             ffi::solClient_context_create(
-                (&mut ffi::_solClient_contextPropsDefaultWithCreateThread) as *mut *const i8,
+                ffi::SOLCLIENT_CONTEXT_PROP_CREATE_THREAD.as_ptr() as *mut *const i8,
                 &mut ctx,
                 &mut context_func,
                 mem::size_of::<ffi::solClient_context_createRegisterFdFuncInfo>(),

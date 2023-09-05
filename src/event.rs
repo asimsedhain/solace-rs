@@ -1,4 +1,4 @@
-use crate::solace::ffi;
+use solace_sys as ffi;
 use core::fmt;
 use enum_primitive::*;
 use std::ffi::CStr;
