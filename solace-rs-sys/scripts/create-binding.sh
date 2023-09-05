@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
 # Must contain `solclient` directory with `solClient.h`, `solClientMsg.h`.
+# Also requires bindgen cli to be installed
 solace_include_path="$1"
 
 bindgen=bindgen

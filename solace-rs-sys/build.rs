@@ -66,10 +66,6 @@ fn main() {
             "Solclient not found. Downloading from {}",
             solclient_tarball_url
         );
-        println!(
-            "cargo:warning=Solclient not found. Downloading from {}",
-            solclient_tarball_url
-        );
         download_and_unpack(
             &solclient_tarball_url,
             solclient_tarball_path,
