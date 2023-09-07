@@ -1,3 +1,4 @@
+use tracing::warn;
 use super::Message;
 use crate::SolClientReturnCode;
 use enum_primitive::*;
@@ -13,7 +14,7 @@ impl Drop for InboundMessage {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
-            println!("warning: message was not dropped properly");
+            warn!("warning: message was not dropped properly");
         }
     }
 }

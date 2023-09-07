@@ -68,7 +68,7 @@ impl Drop for RawContext {
     fn drop(&mut self) {
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
-            println!("WARNING!! Solace context did not drop properly");
+            tracing::warn!("Solace context did not drop properly");
         }
     }
 }

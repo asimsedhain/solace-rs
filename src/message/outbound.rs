@@ -1,11 +1,12 @@
 use super::destination::MessageDestination;
 use super::{ClassOfService, DeliveryMode, Message};
-use solace_rs_sys as ffi;
 use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
+use solace_rs_sys as ffi;
 use std::ffi::{c_void, CString, NulError};
 use std::ptr;
 use thiserror::Error;
+use tracing::warn;
 
 #[derive(Error, Debug)]
 pub enum MessageBuilderError {
@@ -29,7 +30,7 @@ impl Drop for OutboundMessage {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
-            println!("warning: message was not dropped properly");
+            warn!("warning: message was not dropped properly");
         }
     }
 }
@@ -141,14 +142,18 @@ impl OutboundMessageBuilder {
         // on invalid msg_ptr. We validated the message ptr above, so no need to double check.
 
         // delivery_mode
-        let Some(delivery_mode) = self.delivery_mode else{
-            return Err(MessageBuilderError::MissingRequiredArgs("delivery_mode".to_owned()));
+        let Some(delivery_mode) = self.delivery_mode else {
+            return Err(MessageBuilderError::MissingRequiredArgs(
+                "delivery_mode".to_owned(),
+            ));
         };
         unsafe { ffi::solClient_msg_setDeliveryMode(msg_ptr, delivery_mode as u32) };
 
         // destination
-        let Some(destination) = self.destination else{
-            return Err(MessageBuilderError::MissingRequiredArgs("destination".to_owned()));
+        let Some(destination) = self.destination else {
+            return Err(MessageBuilderError::MissingRequiredArgs(
+                "destination".to_owned(),
+            ));
         };
         // destination is being copied by solClient_msg_setDestination
         // so it is fine to create a ptr for the destination.dest
@@ -166,8 +171,10 @@ impl OutboundMessageBuilder {
 
         // binary attachment string
         // We pass the ptr which is then copied over
-        let Some(message) = self.message else{
-            return Err(MessageBuilderError::MissingRequiredArgs("message".to_owned()));
+        let Some(message) = self.message else {
+            return Err(MessageBuilderError::MissingRequiredArgs(
+                "message".to_owned(),
+            ));
         };
         unsafe {
             ffi::solClient_msg_setBinaryAttachment(
