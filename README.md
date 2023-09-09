@@ -4,9 +4,8 @@
 
 
 The Unofficial Solace PubSub+ Rust Client Library.
-Focuses on providing a safe and idiomatic API over the C Solace library.
-It can be used to access the services of a Solace PubSub+ Event Broker.
-The C library is not included.
+
+Focuses on providing safe and idiomatic rust API over the C Solace library.
 
 
 ## Features
@@ -26,12 +25,12 @@ cargo add solace-rs
 ```
 
 ### Configuring Solace Library Link
-You can configure the link to use for downloading the solace c library.
+You can configure the url to use for downloading the solace c library.
 Just add the following [configurable-env](https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#configurable-env) to your [config.toml file](https://doc.rust-lang.org/cargo/reference/config.html)
 
 ```toml
 [env]
-SOLCLIENT_TARBALL_URL=link-to-c-library-tar-ball
+SOLCLIENT_TARBALL_URL=link_to_c_library_tar_ball
 
 ```
 
