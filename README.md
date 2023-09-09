@@ -15,6 +15,23 @@ The C library is not included.
 * Request Reply - TODO
 * Async - TODO
 
+## Installation
+
+```bash
+cargo add solace-rs
+
+```
+
+### Configuring Solace Library Link
+You can configure the link to use for downloading the solace c library.
+Just add the following [configurable-env](https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#configurable-env) to your [config.toml file](https://doc.rust-lang.org/cargo/reference/config.html)
+
+```toml
+[env]
+SOLCLIENT_TARBALL_URL=link-to-c-library-tar-ball
+
+```
+
 
 ## Simple Example
 
@@ -65,3 +82,5 @@ session
     .expect("Could not unsubscribe to topic");
 println!("Unsubscribed from try-me topic");
 ```
+
+More examples can be found in the [example folder.](./examples)

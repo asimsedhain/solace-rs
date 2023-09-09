@@ -233,17 +233,17 @@ mod tests {
         let username = "default";
         let password = "";
         let on_message = |message: InboundMessage| {
-            let Ok(payload) = message.get_payload() else{
+            let Ok(payload) = message.get_payload() else {
                 println!("on_message handler could not decode bytes");
                 return;
             };
-            let Ok(payload) = std::str::from_utf8(payload) else{
+            let Ok(payload) = std::str::from_utf8(payload) else {
                 println!("on_message handler could not decode");
-                return
+                return;
             };
             println!("on_message handler got: {}", payload);
 
-            let Ok(Some(dest)) = message.get_destination()else{
+            let Ok(Some(dest)) = message.get_destination() else {
                 println!("on_message handler could not get destination");
                 return;
             };
@@ -345,7 +345,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         let on_message = move |message: InboundMessage| {
-            let Ok(payload) = message.get_payload()else {
+            let Ok(payload) = message.get_payload() else {
                 return;
             };
             println!("Got message, sending it over the channel");
@@ -371,7 +371,7 @@ mod tests {
         println!("Subscribed to try-me topic");
 
         while let Ok(msg) = rx.recv() {
-            let Ok(payload) = std::str::from_utf8(&msg)else{
+            let Ok(payload) = std::str::from_utf8(&msg) else {
                 break;
             };
             println!("Got on channel: {}", payload);
