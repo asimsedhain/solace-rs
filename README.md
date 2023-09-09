@@ -1,5 +1,8 @@
 # Solace-rs
 
+[![crates.io](https://img.shields.io/crates/v/solace-rs.svg)](https://crates.io/crates/solace-rs)
+
+
 The Unofficial Solace PubSub+ Rust Client Library.
 Focuses on providing a safe and idiomatic API over the C Solace library.
 It can be used to access the services of a Solace PubSub+ Event Broker.
