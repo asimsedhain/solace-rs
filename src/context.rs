@@ -72,3 +72,7 @@ impl Drop for RawContext {
         }
     }
 }
+
+unsafe impl Send for RawContext {}
+
+unsafe impl Sync for RawContext {}
