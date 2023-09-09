@@ -45,7 +45,7 @@ impl Context {
         password: P,
         on_message: Option<M>,
         on_event: Option<E>,
-    ) -> Result<SolSession>
+    ) -> Result<Session>
     where
         H: Into<Vec<u8>>,
         V: Into<Vec<u8>>,
@@ -139,7 +139,7 @@ impl Context {
         let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
 
         if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::Ok) {
-            Ok(SolSession {
+            Ok(Session {
                 _session_pt: session_pt,
                 context: self.clone(),
             })
@@ -149,7 +149,7 @@ impl Context {
     }
 }
 
-pub struct SolSession {
+pub struct Session {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
     pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
@@ -159,10 +159,10 @@ pub struct SolSession {
     context: Context,
 }
 
-unsafe impl Send for SolSession {}
-unsafe impl Sync for SolSession {}
+unsafe impl Send for Session {}
+unsafe impl Sync for Session {}
 
-impl SolSession {
+impl Session {
     pub fn publish(&self, message: OutboundMessage) -> Result<()> {
         let send_message_result = unsafe {
             ffi::solClient_session_sendMsg(self._session_pt, message.get_raw_message_ptr())
@@ -208,7 +208,7 @@ impl SolSession {
     }
 }
 
-impl Drop for SolSession {
+impl Drop for Session {
     fn drop(&mut self) {}
 }
 
@@ -223,7 +223,7 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
-    fn create_print_session(context: &Context) -> Result<SolSession> {
+    fn create_print_session(context: &Context) -> Result<Session> {
         /* utility function for creating basic printing sol session
          * just prints the messages to stdout
          */
