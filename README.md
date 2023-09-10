@@ -2,6 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/solace-rs.svg)](https://crates.io/crates/solace-rs)
 [![docs.rs](https://docs.rs/solace-rs/badge.svg)](https://docs.rs/solace-rs/)
+[![ci](https://github.com/asimsedhain/solace-rs/actions/workflows/ci.yaml/badge.svg)](https://github.com/asimsedhain/solace-rs/actions/workflows/ci.yaml)
 
 
 The Unofficial Solace PubSub+ Rust Client Library.
