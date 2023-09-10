@@ -13,12 +13,12 @@ Focuses on providing safe and idiomatic rust API over the C Solace library.
 
 ## Features
 
-[x] Publishing and subscribing
-    [x] Direct
-    [x] Persistent
-[] Solcache - TODO
-[] Request Reply - TODO
-[] Async - TODO
+- [x] Publishing and subscribing
+    - [x] Direct
+    - [x] Persistent
+- [ ] Solcache - TODO
+- [ ] Request Reply - TODO
+- [ ] Async - TODO
 
 ## Installation
 
@@ -50,10 +50,10 @@ cargo run --example <example_name> -- <example_args>
 
 The current minimum supported Rust version (MSRV) is 1.66.0.
 
-## OS Support / Test
+## OS Support / CI Tests
 
-[x] linux
-[x] linux-musl
-[x] macos-12
-[ ] windows (no plans)
+- [x] linux
+- [x] linux-musl
+- [x] macos-12
+- [ ] windows (no plans)
 
