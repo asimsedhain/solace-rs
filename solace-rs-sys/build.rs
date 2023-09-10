@@ -41,12 +41,6 @@ fn download_and_unpack(url: &str, tarball_path: PathBuf, tarball_unpack_path: Pa
 }
 
 fn main() {
-    cfg_if::cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            panic!("Windows not supported");
-        }
-    }
-
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let solclient_folder_name = "solclient-7.26.1.8";
