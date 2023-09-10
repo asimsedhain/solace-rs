@@ -69,6 +69,9 @@ pub trait Message<'a> {
         if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
             return Err(SolaceError);
         }
+
+        // not supported if u32 cannot be converted to usize
+        // maybe we can add a check at compile time?
         let buf_len = buffer_len.try_into().unwrap();
 
         let safe_slice = unsafe { std::slice::from_raw_parts(buffer as *const u8, buf_len) };
