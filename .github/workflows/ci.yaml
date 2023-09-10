@@ -28,7 +28,7 @@ jobs:
         include:
           - os: macos-12
           - os: ubuntu-20.04
-            additional_targets: [x86_64-unknown-linux-musl]
+            additional_targets: x86_64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
