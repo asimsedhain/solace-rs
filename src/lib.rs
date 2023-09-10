@@ -8,6 +8,9 @@ use solace_rs_sys as ffi;
 use std::fmt;
 use thiserror::Error;
 
+pub use crate::session::Context;
+pub use crate::session::Session;
+
 #[derive(Debug, Clone)]
 pub struct SolaceError;
 

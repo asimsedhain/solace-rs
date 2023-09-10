@@ -9,7 +9,7 @@ use solace_rs::{
     message::{
         DeliveryMode, DestinationType, InboundMessage, MessageDestination, OutboundMessageBuilder,
     },
-    session::Context,
+    Context,
     SolaceLogLevel,
 };
 

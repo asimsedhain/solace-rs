@@ -2,14 +2,12 @@
 Example showing how to create a solace context, session and subscribing to a topic using
 the session.
 */
-
 use std::{thread::sleep, time::Duration};
 
 use solace_rs::{
     event::SessionEvent,
     message::{InboundMessage, Message},
-    session::Context,
-    SolaceLogLevel,
+    Context, SolaceLogLevel,
 };
 
 fn main() {
