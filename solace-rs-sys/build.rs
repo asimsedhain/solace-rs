@@ -41,6 +41,13 @@ fn download_and_unpack(url: &str, tarball_path: PathBuf, tarball_unpack_path: Pa
 }
 
 fn main() {
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "windows")] {
+            panic!("Windows currently not supported");
+        }
+    }
+
+
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let solclient_folder_name = "solclient-7.26.1.8";
@@ -80,14 +87,7 @@ fn main() {
         }
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            println!("cargo:rustc-link-lib=dylib=crypto");
-        }else{
-            println!("cargo:rustc-link-lib=static=crypto");
-        }
-    }
-
+    println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
     println!("cargo:rustc-link-lib=static=solclient");
     println!("cargo:rustc-link-lib=static=solclientssl");
