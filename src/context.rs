@@ -3,6 +3,7 @@ use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::mem;
 use std::ptr;
+use tracing::warn;
 
 type Result<T> = std::result::Result<T, ContextError>;
 
@@ -68,7 +69,7 @@ impl Drop for RawContext {
     fn drop(&mut self) {
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
-            tracing::warn!("Solace context did not drop properly");
+            warn!("Solace context did not drop properly");
         }
     }
 }
