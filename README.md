@@ -1,6 +1,7 @@
 # Solace-rs
 
 [![crates.io](https://img.shields.io/crates/v/solace-rs.svg)](https://crates.io/crates/solace-rs)
+[![docs.rs](https://docs.rs/solace-rs/badge.svg)](https://docs.rs/solace-rs/)
 
 
 The Unofficial Solace PubSub+ Rust Client Library.

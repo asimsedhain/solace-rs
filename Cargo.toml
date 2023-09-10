@@ -9,7 +9,7 @@ authors = ["Ashim Sedhain <asimsedhain33@gmail.com>"]
 
 repository = "https://github.com/asimsedhain/solace-rs"
 homepage = "https://github.com/asimsedhain/solace-rs"
-documentation = "https://github.com/asimsedhain/solace-rs"
+documentation = "https://docs.rs/solace-rs"
 
 description = """
 The Unofficial Solace PubSub+ Rust Client Library.
