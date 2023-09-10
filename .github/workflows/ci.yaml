@@ -28,14 +28,12 @@ jobs:
         include:
           - os: macos-12
           - os: ubuntu-20.04
-            additional_targets: x86_64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
         with:
           toolchain: ${{ env.rust_version }}
-          targets: ${{ matrix.additional_targets }}
       - run: cargo build --all-targets --verbose
       - run: cargo test
       - run: cd solace-rs-sys && cargo test
