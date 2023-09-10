@@ -10,17 +10,15 @@ The Unofficial Solace PubSub+ Rust Client Library.
 Focuses on providing safe and idiomatic rust API over the C Solace library.
 
 
-Only supports rust version: 1.66.0+
-
 
 ## Features
 
-* Publishing and subscribing
-    * Direct
-    * Persistent
-* Solcache - TODO
-* Request Reply - TODO
-* Async - TODO
+[x] Publishing and subscribing
+    [x] Direct
+    [x] Persistent
+[] Solcache - TODO
+[] Request Reply - TODO
+[] Async - TODO
 
 ## Installation
 
@@ -47,3 +45,15 @@ You can find examples in the [examples folder](./examples). To run them:
 ```bash
 cargo run --example <example_name> -- <example_args>
 ```
+
+## Minimum supported Rust version (MSRV)
+
+The current minimum supported Rust version (MSRV) is 1.66.0.
+
+## OS Support / Test
+
+[x] linux
+[x] linux-musl
+[x] macos-12
+[ ] windows (no plans)
+
