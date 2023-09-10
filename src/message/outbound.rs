@@ -186,6 +186,7 @@ impl OutboundMessageBuilder {
 
         // correlation_id
         if let Some(id) = self.correlation_id {
+            // correlation_id is copied over
             unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
         }
 
@@ -208,7 +209,7 @@ impl OutboundMessageBuilder {
         if let Some(id) = self.application_id {
             // application id is copied over
             unsafe {
-                ffi::solClient_msg_setApplicationMessageId(msg_ptr, id.as_ptr() as *const i8)
+                ffi::solClient_msg_setApplicationMessageId(msg_ptr, CString::new(id)?.as_ptr())
             };
         }
 
@@ -218,7 +219,7 @@ impl OutboundMessageBuilder {
             unsafe {
                 ffi::solClient_msg_setApplicationMsgType(
                     msg_ptr,
-                    message_type.as_ptr() as *const i8,
+                    CString::new(message_type)?.as_ptr(),
                 )
             };
         }
@@ -235,10 +236,12 @@ mod tests {
     #[test]
     fn it_should_build_message() {
         let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
-        let _builder = OutboundMessageBuilder::new()
+        let _ = OutboundMessageBuilder::new()
             .delivery_mode(DeliveryMode::Direct)
             .destination(dest)
-            .payload("Hello");
+            .payload("Hello")
+            .build()
+            .unwrap();
     }
 
     #[test]
@@ -390,7 +393,6 @@ mod tests {
         let message = OutboundMessageBuilder::new()
             .delivery_mode(DeliveryMode::Direct)
             .destination(dest)
-            .application_msg_type("test_id")
             .payload("Hello")
             .build()
             .unwrap();
