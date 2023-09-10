@@ -2,12 +2,12 @@ pub mod destination;
 pub mod inbound;
 pub mod outbound;
 
-use solace_rs_sys as ffi;
 use crate::{Result, SolClientReturnCode, SolaceError};
 pub use destination::{DestinationType, MessageDestination};
 use enum_primitive::*;
 pub use inbound::InboundMessage;
 pub use outbound::{OutboundMessage, OutboundMessageBuilder};
+use solace_rs_sys as ffi;
 use std::ffi::CStr;
 use std::mem;
 use std::ptr;

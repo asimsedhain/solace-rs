@@ -1,6 +1,6 @@
-use solace_rs_sys as ffi;
 use core::fmt;
 use enum_primitive::*;
+use solace_rs_sys as ffi;
 use std::ffi::CStr;
 
 enum_from_primitive! {

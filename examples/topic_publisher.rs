@@ -9,8 +9,7 @@ use solace_rs::{
     message::{
         DeliveryMode, DestinationType, InboundMessage, MessageDestination, OutboundMessageBuilder,
     },
-    Context,
-    SolaceLogLevel,
+    Context, SolaceLogLevel,
 };
 
 fn main() {

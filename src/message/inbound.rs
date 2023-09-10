@@ -1,10 +1,10 @@
-use tracing::warn;
 use super::Message;
 use crate::SolClientReturnCode;
 use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::convert::From;
 use std::time::SystemTime;
+use tracing::warn;
 
 pub struct InboundMessage {
     msg_ptr: ffi::solClient_opaqueMsg_pt,

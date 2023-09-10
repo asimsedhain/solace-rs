@@ -37,7 +37,7 @@ where
 
     let non_null_raw_user_closure = std::ptr::NonNull::new(raw_user_closure);
 
-    let Some(raw_user_closure) =  non_null_raw_user_closure else{
+    let Some(raw_user_closure) = non_null_raw_user_closure else {
         return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
     };
 
@@ -60,15 +60,15 @@ extern "C" fn static_on_event<F>(
 {
     let non_null_raw_user_closure = std::ptr::NonNull::new(raw_user_closure);
 
-    let Some(raw_user_closure) =  non_null_raw_user_closure else{
-        return
+    let Some(raw_user_closure) = non_null_raw_user_closure else {
+        return;
     };
     let raw_event = unsafe { (*event_info_p).sessionEvent };
 
-    let Some(event) = SessionEvent::from_u32(raw_event) else{
+    let Some(event) = SessionEvent::from_u32(raw_event) else {
         // TODO
         // log a warning
-        return
+        return;
     };
 
     let user_closure: &mut Box<F> = unsafe { mem::transmute(raw_user_closure) };
