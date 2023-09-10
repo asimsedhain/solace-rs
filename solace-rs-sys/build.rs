@@ -80,7 +80,14 @@ fn main() {
         }
     }
 
-    println!("cargo:rustc-link-lib=static=crypto");
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "windows")] {
+            println!("cargo:rustc-link-lib=dylib=crypto");
+        }else{
+            println!("cargo:rustc-link-lib=static=crypto");
+        }
+    }
+
     println!("cargo:rustc-link-lib=static=ssl");
     println!("cargo:rustc-link-lib=static=solclient");
     println!("cargo:rustc-link-lib=static=solclientssl");
