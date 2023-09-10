@@ -6,7 +6,7 @@ use std::convert::From;
 use std::ffi::{CStr, CString};
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq, Default)]
+    #[derive(Debug, PartialEq, Eq, Default)]
     #[repr(i32)]
     pub enum DestinationType {
         #[default]

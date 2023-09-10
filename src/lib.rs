@@ -23,7 +23,7 @@ impl fmt::Display for SolaceError {
 }
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     #[repr(u32)]
     pub enum SolaceLogLevel {
         Critical = ffi::solClient_log_level_SOLCLIENT_LOG_CRITICAL,
@@ -36,7 +36,7 @@ enum_from_primitive! {
 }
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     #[repr(i32)]
     pub enum SolClientReturnCode {
         Ok=ffi::solClient_returnCode_SOLCLIENT_OK,

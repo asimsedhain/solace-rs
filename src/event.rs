@@ -4,7 +4,7 @@ use solace_rs_sys as ffi;
 use std::ffi::CStr;
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq, Copy, Clone)]
+    #[derive(Debug, PartialEq, Eq, Copy, Clone)]
     #[repr(u32)]
     pub enum SessionEvent {
         UpNotice=ffi::solClient_session_event_SOLCLIENT_SESSION_EVENT_UP_NOTICE,

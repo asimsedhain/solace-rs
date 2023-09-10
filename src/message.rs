@@ -13,7 +13,7 @@ use std::mem;
 use std::ptr;
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     #[repr(u32)]
     pub enum DeliveryMode {
         Direct=ffi::SOLCLIENT_DELIVERY_MODE_DIRECT,
@@ -23,7 +23,7 @@ enum_from_primitive! {
 }
 
 enum_from_primitive! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     #[repr(u32)]
     pub enum ClassOfService {
         One=ffi::SOLCLIENT_COS_1,
