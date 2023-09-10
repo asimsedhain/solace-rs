@@ -38,5 +38,5 @@ jobs:
           toolchain: ${{ env.rust_version }}
       - run: cargo build --all-targets --verbose
       - run: cargo test
-      - run: cd rdkafka-sys && cargo test
+      - run: cd solace-rs-sys && cargo test
 
