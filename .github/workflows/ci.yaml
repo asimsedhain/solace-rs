@@ -26,9 +26,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-11.0
+          - os: macos-12.0
           - os: windows-2019
-          - os: ubuntu-20.04
           - os: ubuntu-20.04
     runs-on: ${{ matrix.os }}
     steps:
