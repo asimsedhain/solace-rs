@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  rust_version: 1.61.0
+
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
+        with:
+          toolchain: ${{ env.rust_version }}
+          components: rustfmt, clippy
+      - run: cargo fmt -- --check
+      - run: cargo clippy -- -Dwarnings
+      - run: cargo test --doc
+
+  test:
+    strategy:
+      matrix:
+        include:
+          - os: macos-11.0
+          - os: windows-2019
+          - os: ubuntu-20.04
+          - os: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
+        with:
+          toolchain: ${{ env.rust_version }}
+      - run: cargo build --all-targets --verbose
+      - run: cargo test
+      - run: cd rdkafka-sys && cargo test
+
