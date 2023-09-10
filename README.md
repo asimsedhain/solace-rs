@@ -10,6 +10,9 @@ The Unofficial Solace PubSub+ Rust Client Library.
 Focuses on providing safe and idiomatic rust API over the C Solace library.
 
 
+Only supports rust version: 1.66.0+
+
+
 ## Features
 
 * Publishing and subscribing
