@@ -47,6 +47,10 @@ fn main() {
         }
     }
 
+    // do nothing if we are just building the docs
+    if std::env::var("DOCS_RS").is_ok() {
+        return;
+    }
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
