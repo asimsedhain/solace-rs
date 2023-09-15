@@ -61,24 +61,28 @@ fn main() {
         "https://github.com/asimsedhain/solace-rs/releases/download/0.0.0.0/{SOLCLIENT_GZ_PATH}"
     );
 
-    let solclient_tarball_url =
-        env::var("SOLCLIENT_TARBALL_URL").unwrap_or(solclient_tarball_default_url);
+    let lib_dir = if env::var("SOLCLIENT_LIB_PATH").is_ok() {
+        PathBuf::from(env::var("SOLCLIENT_LIB_PATH").unwrap())
+    } else {
+        let solclient_tarball_url =
+            env::var("SOLCLIENT_TARBALL_URL").unwrap_or(solclient_tarball_default_url);
 
-    let solclient_tarball_path = out_dir.join(format!("{solclient_folder_name}.tar.gz"));
+        let solclient_tarball_path = out_dir.join(format!("{solclient_folder_name}.tar.gz"));
 
-    if !solclient_folder_path.is_dir() {
-        eprintln!(
-            "Solclient not found. Downloading from {}",
-            solclient_tarball_url
-        );
-        download_and_unpack(
-            &solclient_tarball_url,
-            solclient_tarball_path,
-            solclient_folder_path.clone(),
-        );
-    }
+        if !solclient_folder_path.is_dir() {
+            eprintln!(
+                "Solclient not found. Downloading from {}",
+                solclient_tarball_url
+            );
+            download_and_unpack(
+                &solclient_tarball_url,
+                solclient_tarball_path,
+                solclient_folder_path.clone(),
+            );
+        }
 
-    let lib_dir = solclient_folder_path.join("lib");
+        solclient_folder_path.join("lib")
+    };
 
     println!(
         "cargo:rustc-link-search=native={}",
