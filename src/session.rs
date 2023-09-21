@@ -269,9 +269,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_publishes() {
-        let solace_context = Context::new(SolaceLogLevel::Warning)
-            .map_err(|_| SessionError::InitializationFailure)
-            .unwrap();
+        let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
         println!("Context created");
         let session = create_print_session(&solace_context).unwrap();
         println!("Session created");
@@ -312,9 +310,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_listens() {
-        let solace_context = Context::new(SolaceLogLevel::Warning)
-            .map_err(|_| SessionError::InitializationFailure)
-            .unwrap();
+        let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
         println!("Context created");
         let session = create_print_session(&solace_context).unwrap();
 
@@ -337,9 +333,7 @@ mod tests {
     #[test]
     #[ignore]
     fn it_subscribes_and_listen_over_channel() {
-        let solace_context = Context::new(SolaceLogLevel::Warning)
-            .map_err(|_| SessionError::InitializationFailure)
-            .unwrap();
+        let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
         println!("Context created");
 
         let (tx, rx) = mpsc::channel();
