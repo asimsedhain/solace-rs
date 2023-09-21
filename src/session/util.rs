@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use crate::event::SessionEvent;
 use crate::message::InboundMessage;
 use solace_rs_sys as ffi;
-use std::{mem, ptr};
+use std::mem;
 
 pub(super) fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
 where
@@ -41,14 +41,11 @@ where
         return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
     };
 
-    let mut dup_msg_ptr = ptr::null_mut();
-    unsafe { ffi::solClient_msg_dup(msg_p, &mut dup_msg_ptr) };
-
-    let message = InboundMessage::from(dup_msg_ptr);
+    let message = InboundMessage::from(msg_p);
     let user_closure: &mut Box<F> = unsafe { mem::transmute(raw_user_closure) };
     user_closure(message);
 
-    ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
+    ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_TAKE_MSG
 }
 
 extern "C" fn static_on_event<F>(
