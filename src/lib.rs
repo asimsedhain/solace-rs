@@ -1,3 +1,4 @@
+pub mod cache_session;
 pub mod context;
 pub mod event;
 pub mod message;
@@ -58,7 +59,6 @@ pub enum ContextError {
     #[error("context thread failed to initialize")]
     InitializationFailed,
 }
-
 
 #[derive(Error, Debug)]
 pub enum SessionError {
