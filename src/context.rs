@@ -67,6 +67,9 @@ impl RawContext {
 
 impl Drop for RawContext {
     fn drop(&mut self) {
+        // TODO
+        // shifts cleanup to be context specific
+        // only clean up globally when all the contexts have died
         let return_code = unsafe { ffi::solClient_cleanup() };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
             warn!("Solace context did not drop properly");
