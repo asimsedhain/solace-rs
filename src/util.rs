@@ -5,14 +5,14 @@ use crate::message::InboundMessage;
 use solace_rs_sys as ffi;
 use std::mem;
 
-pub(super) fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
+pub fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
 where
     F: FnMut(InboundMessage) + Send + 'static,
 {
     Some(static_on_message::<F>)
 }
 
-pub(super) fn on_event_trampoline<F>(_closure: &F) -> ffi::solClient_session_eventCallbackFunc_t
+pub fn on_event_trampoline<F>(_closure: &F) -> ffi::solClient_session_eventCallbackFunc_t
 where
     F: FnMut(SessionEvent) + Send + 'static,
 {

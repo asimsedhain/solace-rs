@@ -2,13 +2,14 @@ pub mod context;
 pub mod event;
 pub mod message;
 pub mod session;
+pub(crate) mod util;
 
 use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::fmt;
 use thiserror::Error;
 
-pub use crate::session::Context;
+pub use crate::context::Context;
 pub use crate::session::Session;
 
 #[derive(Debug, Clone)]
@@ -56,4 +57,19 @@ enum_from_primitive! {
 pub enum ContextError {
     #[error("context thread failed to initialize")]
     InitializationFailed,
+}
+
+
+#[derive(Error, Debug)]
+pub enum SessionError {
+    #[error("session receieved invalid argument")]
+    InvalidArgs(#[from] std::ffi::NulError),
+    #[error("session failed to connect")]
+    ConnectionFailure,
+    #[error("session failed to initialize")]
+    InitializationFailure,
+    #[error("session failed to subscribe on topic: {0}")]
+    SubscriptionFailure(String),
+    #[error("session failed to unsubscribe on topic: {0}")]
+    UnsubscriptionFailure(String),
 }
