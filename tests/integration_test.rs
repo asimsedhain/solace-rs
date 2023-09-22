@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::mpsc,
+    sync::{mpsc, Arc},
     thread::sleep,
     time::Duration,
 };
@@ -96,7 +96,7 @@ fn multi_subscribe_and_publish() {
     let tx1 = tx0.clone();
     let tx_clone = tx0.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
-    let topic = "publish_and_receive";
+    let topic = "multi_subscribe_and_publish";
 
     let session0 = solace_context
         .session(
@@ -195,7 +195,7 @@ fn unsubscribe_and_publish() {
     let tx_clone0 = tx.clone();
     let tx_clone1 = tx.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
-    let topic = "publish_and_receive";
+    let topic = "unsubscribe_and_publish";
 
     let on_message = move |message: InboundMessage| {
         let Ok(payload) = message.get_payload() else {
@@ -284,4 +284,95 @@ fn unsubscribe_and_publish() {
 
 #[test]
 #[ignore]
-fn multi_thread_publisher() {}
+fn multi_thread_publisher() {
+    let sleep_time = Duration::from_millis(500);
+
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let tx_clone = tx.clone();
+    let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
+    let topic = "multi_thread_publisher";
+
+    let on_message = move |message: InboundMessage| {
+        let Ok(payload) = message.get_payload() else {
+            return;
+        };
+        let _ = tx.send(TestMessage::SolaceMessage(payload.to_owned()));
+    };
+
+    let session = Arc::new(
+        solace_context
+            .session(
+                "tcp://localhost:55554",
+                "default",
+                "default",
+                "",
+                Some(on_message),
+                Some(|_: SessionEvent| {}),
+            )
+            .expect("creating session"),
+    );
+
+    session.subscribe(topic).expect("multi_thread_publisher");
+
+    // need to wait before publishing so that the client is properly subscribed
+    sleep(sleep_time);
+
+    for _ in 0..3 {
+        let session_clone = session.clone();
+        let tx_msgs_clone = tx_msgs.clone();
+        std::thread::spawn(move || {
+            for msg in tx_msgs_clone {
+                let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
+                let outbound_msg = OutboundMessageBuilder::new()
+                    .destination(dest)
+                    .delivery_mode(DeliveryMode::Direct)
+                    .payload(msg)
+                    .build()
+                    .expect("building outbound msg");
+                session_clone
+                    .publish(outbound_msg)
+                    .expect("publishing message");
+            }
+        });
+    }
+
+    std::thread::spawn(move || {
+        sleep(sleep_time);
+        tx_clone
+            .send(TestMessage::TimerError)
+            .expect("sending timer error");
+    });
+
+    let mut rx_msgs = vec![];
+    while let Ok(msg) = rx.recv() {
+        match msg {
+            TestMessage::SolaceMessage(msg) => {
+                let str = String::from_utf8_lossy(&msg).to_string();
+                rx_msgs.push(str);
+                if rx_msgs.len() == tx_msgs.len() * 3 {
+                    break;
+                }
+            }
+            TestMessage::TimerError => panic!(),
+        }
+    }
+
+    let mut rx_msg_map = HashMap::new();
+    for msg in rx_msgs {
+        *rx_msg_map.entry(msg).or_insert(0) += 1;
+    }
+
+    assert_eq!(
+        tx_msgs.clone().into_iter().collect::<HashSet<_>>(),
+        rx_msg_map
+            .keys()
+            .map(|v| v.as_str())
+            .collect::<HashSet<_>>()
+    );
+
+    assert_eq!(
+        tx_msgs.iter().map(|_| 3).collect::<Vec<_>>(),
+        rx_msg_map.into_values().collect::<Vec<_>>()
+    )
+}
