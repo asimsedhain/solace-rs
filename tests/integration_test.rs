@@ -14,19 +14,13 @@ use solace_rs::{
     Context, SolaceLogLevel,
 };
 
-enum TestMessage {
-    SolaceMessage(Vec<u8>),
-    TimerError,
-}
+static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
 
 #[test]
 #[ignore]
 fn subscribe_and_publish() {
-    let sleep_time = Duration::from_millis(500);
-
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
-    let tx_clone = tx.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "publish_and_receive";
 
@@ -34,7 +28,7 @@ fn subscribe_and_publish() {
         let Ok(payload) = message.get_payload() else {
             return;
         };
-        let _ = tx.send(TestMessage::SolaceMessage(payload.to_owned()));
+        let _ = tx.send(payload.to_owned());
     };
 
     let session = solace_context
@@ -50,7 +44,7 @@ fn subscribe_and_publish() {
     session.subscribe(topic).expect("subscribing to topic");
 
     // need to wait before publishing so that the client is properly subscribed
-    sleep(sleep_time);
+    sleep(SLEEP_TIME);
 
     for msg in tx_msgs.clone() {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
@@ -62,24 +56,20 @@ fn subscribe_and_publish() {
             .expect("building outbound msg");
         session.publish(outbound_msg).expect("publishing message");
     }
-    std::thread::spawn(move || {
-        sleep(sleep_time);
-        tx_clone
-            .send(TestMessage::TimerError)
-            .expect("sending timer error");
-    });
+    sleep(SLEEP_TIME);
 
     let mut rx_msgs = vec![];
-    while let Ok(msg) = rx.recv() {
-        match msg {
-            TestMessage::SolaceMessage(msg) => {
+
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
                 let str = String::from_utf8_lossy(&msg).to_string();
                 rx_msgs.push(str);
                 if rx_msgs.len() == tx_msgs.len() {
                     break;
                 }
             }
-            TestMessage::TimerError => panic!(),
+            Err(_) => panic!(),
         }
     }
 
@@ -89,12 +79,11 @@ fn subscribe_and_publish() {
 #[test]
 #[ignore]
 fn multi_subscribe_and_publish() {
-    let sleep_time = Duration::from_millis(500);
+    let msg_multiplier = 2;
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx0, rx) = mpsc::channel();
     let tx1 = tx0.clone();
-    let tx_clone = tx0.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "multi_subscribe_and_publish";
 
@@ -108,7 +97,7 @@ fn multi_subscribe_and_publish() {
                 let Ok(payload) = message.get_payload() else {
                     return;
                 };
-                let _ = tx0.send(TestMessage::SolaceMessage(payload.to_owned()));
+                let _ = tx0.send(payload.to_owned());
             }),
             Some(|_: SessionEvent| {}),
         )
@@ -125,7 +114,7 @@ fn multi_subscribe_and_publish() {
                 let Ok(payload) = message.get_payload() else {
                     return;
                 };
-                let _ = tx1.send(TestMessage::SolaceMessage(payload.to_owned()));
+                let _ = tx1.send(payload.to_owned());
             }),
             Some(|_: SessionEvent| {}),
         )
@@ -133,7 +122,7 @@ fn multi_subscribe_and_publish() {
     session1.subscribe(topic).expect("subscribing to topic");
 
     // need to wait before publishing so that the client is properly subscribed
-    sleep(sleep_time);
+    sleep(SLEEP_TIME);
 
     for msg in tx_msgs.clone() {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
@@ -145,24 +134,20 @@ fn multi_subscribe_and_publish() {
             .expect("building outbound msg");
         session0.publish(outbound_msg).expect("publishing message");
     }
-    std::thread::spawn(move || {
-        sleep(sleep_time);
-        tx_clone
-            .send(TestMessage::TimerError)
-            .expect("sending timer error");
-    });
+
+    sleep(SLEEP_TIME);
 
     let mut rx_msgs = vec![];
-    while let Ok(msg) = rx.recv() {
-        match msg {
-            TestMessage::SolaceMessage(msg) => {
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
                 let str = String::from_utf8_lossy(&msg).to_string();
                 rx_msgs.push(str);
-                if rx_msgs.len() == tx_msgs.len() * 2 {
+                if rx_msgs.len() == tx_msgs.len() * msg_multiplier {
                     break;
                 }
             }
-            TestMessage::TimerError => panic!(),
+            Err(_) => panic!(),
         }
     }
 
@@ -180,7 +165,7 @@ fn multi_subscribe_and_publish() {
     );
 
     assert_eq!(
-        tx_msgs.iter().map(|_| 2).collect::<Vec<_>>(),
+        tx_msgs.iter().map(|_| msg_multiplier).collect::<Vec<_>>(),
         rx_msg_map.into_values().collect::<Vec<_>>()
     )
 }
@@ -188,12 +173,8 @@ fn multi_subscribe_and_publish() {
 #[test]
 #[ignore]
 fn unsubscribe_and_publish() {
-    let sleep_time = Duration::from_millis(500);
-
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
-    let tx_clone0 = tx.clone();
-    let tx_clone1 = tx.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "unsubscribe_and_publish";
 
@@ -201,7 +182,7 @@ fn unsubscribe_and_publish() {
         let Ok(payload) = message.get_payload() else {
             return;
         };
-        let _ = tx.send(TestMessage::SolaceMessage(payload.to_owned()));
+        let _ = tx.send(payload.to_owned());
     };
 
     let session = solace_context
@@ -216,7 +197,7 @@ fn unsubscribe_and_publish() {
         .expect("creating session");
     session.subscribe(topic).expect("subscribing to topic");
 
-    sleep(sleep_time);
+    sleep(SLEEP_TIME);
 
     for msg in tx_msgs.clone() {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
@@ -231,30 +212,24 @@ fn unsubscribe_and_publish() {
 
     session.unsubscribe(topic).expect("unsubscribing to topic");
 
-    std::thread::spawn(move || {
-        sleep(sleep_time);
-        tx_clone0
-            .send(TestMessage::TimerError)
-            .expect("sending timer error");
-    });
+    sleep(SLEEP_TIME);
 
     let mut rx_msgs = vec![];
-    while let Ok(msg) = rx.recv() {
-        match msg {
-            TestMessage::SolaceMessage(msg) => {
+
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
                 let str = String::from_utf8_lossy(&msg).to_string();
                 rx_msgs.push(str);
                 if rx_msgs.len() == tx_msgs.len() {
                     break;
                 }
             }
-            TestMessage::TimerError => panic!(),
+            Err(_) => panic!(),
         }
     }
-    assert_eq!(tx_msgs, rx_msgs);
 
-    // discard the timer error
-    let _ = rx.recv();
+    assert_eq!(tx_msgs, rx_msgs);
 
     for msg in tx_msgs.clone() {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
@@ -267,29 +242,20 @@ fn unsubscribe_and_publish() {
         session.publish(outbound_msg).expect("publishing message");
     }
 
-    std::thread::spawn(move || {
-        sleep(sleep_time);
-        tx_clone1
-            .send(TestMessage::TimerError)
-            .expect("sending timer error");
-    });
+    sleep(SLEEP_TIME);
 
-    while let Ok(msg) = rx.recv() {
-        match msg {
-            TestMessage::SolaceMessage(_) => panic!(),
-            TestMessage::TimerError => break,
-        }
+    if rx.try_recv().is_ok() {
+        panic!()
     }
 }
 
 #[test]
 #[ignore]
 fn multi_thread_publisher() {
-    let sleep_time = Duration::from_millis(500);
+    let msg_multiplier = 3;
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
-    let tx_clone = tx.clone();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "multi_thread_publisher";
 
@@ -297,7 +263,7 @@ fn multi_thread_publisher() {
         let Ok(payload) = message.get_payload() else {
             return;
         };
-        let _ = tx.send(TestMessage::SolaceMessage(payload.to_owned()));
+        let _ = tx.send(payload.to_owned());
     };
 
     let session = Arc::new(
@@ -316,9 +282,9 @@ fn multi_thread_publisher() {
     session.subscribe(topic).expect("multi_thread_publisher");
 
     // need to wait before publishing so that the client is properly subscribed
-    sleep(sleep_time);
+    sleep(SLEEP_TIME);
 
-    for _ in 0..3 {
+    for _ in 0..msg_multiplier {
         let session_clone = session.clone();
         let tx_msgs_clone = tx_msgs.clone();
         std::thread::spawn(move || {
@@ -337,24 +303,20 @@ fn multi_thread_publisher() {
         });
     }
 
-    std::thread::spawn(move || {
-        sleep(sleep_time);
-        tx_clone
-            .send(TestMessage::TimerError)
-            .expect("sending timer error");
-    });
+    sleep(SLEEP_TIME);
 
     let mut rx_msgs = vec![];
-    while let Ok(msg) = rx.recv() {
-        match msg {
-            TestMessage::SolaceMessage(msg) => {
+
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
                 let str = String::from_utf8_lossy(&msg).to_string();
                 rx_msgs.push(str);
-                if rx_msgs.len() == tx_msgs.len() * 3 {
+                if rx_msgs.len() == tx_msgs.len() * msg_multiplier {
                     break;
                 }
             }
-            TestMessage::TimerError => panic!(),
+            Err(_) => panic!(),
         }
     }
 
@@ -372,7 +334,7 @@ fn multi_thread_publisher() {
     );
 
     assert_eq!(
-        tx_msgs.iter().map(|_| 3).collect::<Vec<_>>(),
+        tx_msgs.iter().map(|_| msg_multiplier).collect::<Vec<_>>(),
         rx_msg_map.into_values().collect::<Vec<_>>()
     )
 }
