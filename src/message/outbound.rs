@@ -30,7 +30,7 @@ impl Drop for OutboundMessage {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
-            warn!("warning: message was not dropped properly");
+            warn!("message was not dropped properly");
         }
     }
 }

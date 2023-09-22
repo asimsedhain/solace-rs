@@ -11,6 +11,7 @@ use solace_rs_sys as ffi;
 use std::ffi::CString;
 use std::ptr;
 use std::sync::Arc;
+use tracing::warn;
 use util::{on_event_trampoline, on_message_trampoline};
 
 type Result<T> = std::result::Result<T, SessionError>;
@@ -21,9 +22,12 @@ type Result<T> = std::result::Result<T, SessionError>;
 /// references the same underlying C context. Internally, an `Arc` is
 /// used to implement this in a threadsafe way.
 ///
+/// Important: Only initialize one context per application as it initializes global variables upon
+/// creation.
 /// Also note that this binding deviates from the C API in that each
 /// session created from a context initially owns a clone of that
 /// context.
+///
 ///
 #[derive(Clone)]
 pub struct Context {
@@ -209,5 +213,10 @@ impl Session {
 }
 
 impl Drop for Session {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        let session_free_result = unsafe { ffi::solClient_session_destroy(&mut self._session_pt) };
+        if SolClientReturnCode::from_i32(session_free_result) != Some(SolClientReturnCode::Ok) {
+            warn!("session was not dropped properly");
+        }
+    }
 }
