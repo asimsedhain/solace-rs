@@ -6,7 +6,6 @@ use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::ffi::CString;
-use std::ptr;
 use tracing::warn;
 
 type Result<T> = std::result::Result<T, SessionError>;
@@ -69,7 +68,6 @@ impl Session {
         Ok(())
     }
 
-    // TODO
     pub fn cache_session<N>(
         self,
         cache_name: N,
@@ -80,33 +78,7 @@ impl Session {
     where
         N: Into<Vec<u8>>,
     {
-        let c_cache_name = CString::new(cache_name)?;
-
-        let cache_session_props = [
-            ffi::SOLCLIENT_CACHESESSION_PROP_CACHE_NAME.as_ptr(),
-            c_cache_name.as_ptr() as *const u8,
-            ptr::null(),
-        ]
-        .as_mut_ptr() as *mut *const i8;
-
-        let mut cache_session_pt: ffi::solClient_opaqueCacheSession_pt = ptr::null_mut();
-
-        let cache_create_result = unsafe {
-            ffi::solClient_session_createCacheSession(
-                cache_session_props,
-                self._session_pt,
-                &mut cache_session_pt,
-            )
-        };
-
-        if SolClientReturnCode::from_i32(cache_create_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SessionError::InitializationFailure);
-        }
-
-        Ok(CacheSession {
-            session: self,
-            _cache_session_pt: cache_session_pt,
-        })
+        CacheSession::new(self, cache_name, max_message, max_age, timeout_ms)
     }
 }
 
