@@ -84,7 +84,7 @@ impl CacheSession {
         T: Into<Vec<u8>>,
     {
         let c_topic = CString::new(topic)?;
-        let flags = ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FULFILL;
+        let flags = ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FLOWTHRU;
 
         let request_result = unsafe {
             ffi::solClient_cacheSession_sendCacheRequest(
