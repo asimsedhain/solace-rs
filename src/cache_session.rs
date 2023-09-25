@@ -79,10 +79,29 @@ impl CacheSession {
         })
     }
 
-    pub fn blocking_cache_request<T>(_topic: T, _request_id: u64) -> Result<(), SessionError>
+    pub fn blocking_cache_request<T>(self, topic: T, request_id: u64) -> Result<(), SessionError>
     where
         T: Into<Vec<u8>>,
     {
-        todo!()
+        let c_topic = CString::new(topic)?;
+        let flags = ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FULFILL;
+
+        let request_result = unsafe {
+            ffi::solClient_cacheSession_sendCacheRequest(
+                self._cache_session_pt,
+                c_topic.as_ptr(),
+                request_id,
+                None,
+                ptr::null_mut(),
+                flags,
+                0,
+            )
+        };
+
+        if SolClientReturnCode::from_i32(request_result) != Some(SolClientReturnCode::Ok) {
+            return Err(SessionError::CacheRequestFailure);
+        }
+
+        Ok(())
     }
 }

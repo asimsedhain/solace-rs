@@ -72,4 +72,6 @@ pub enum SessionError {
     SubscriptionFailure(String),
     #[error("session failed to unsubscribe on topic: {0}")]
     UnsubscriptionFailure(String),
+    #[error("cache request failed")]
+    CacheRequestFailure,
 }
