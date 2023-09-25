@@ -27,6 +27,32 @@ jobs:
       matrix:
         include:
           - os: macos-12
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
+        with:
+          toolchain: ${{ env.rust_version }}
+      - run: cargo build --all-targets --verbose
+      - run: cargo test
+      - run: cd solace-rs-sys && cargo test
+
+
+# github actions only supports container services on ubuntu
+  integration-test:
+    services:
+      solace:
+        image: solace/solace-pubsub-standard:10.5
+        options: --shm-size=1gb
+        env: 
+          username_admin_globalaccesslevel: admin
+          username_admin_password: admin
+          system_scaling_maxconnectioncount: 100
+        ports:
+          - 55555:55555
+    strategy:
+      matrix:
+        include:
           - os: ubuntu-20.04
     runs-on: ${{ matrix.os }}
     steps:
@@ -36,5 +62,9 @@ jobs:
           toolchain: ${{ env.rust_version }}
       - run: cargo build --all-targets --verbose
       - run: cargo test
+      - run: cargo test -- --ignored
+        env:
+          SOLACE_HOST: 0.0.0.0
+          SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
       - run: cd solace-rs-sys && cargo test
 
