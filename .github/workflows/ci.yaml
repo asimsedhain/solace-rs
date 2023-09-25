@@ -43,6 +43,7 @@ jobs:
     services:
       solace:
         image: solace/solace-pubsub-standard:10.5
+        options: --shm-size=1gb
         env: 
           username_admin_globalaccesslevel: admin
           username_admin_password: admin
