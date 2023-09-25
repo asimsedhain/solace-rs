@@ -48,7 +48,7 @@ jobs:
           username_admin_password: admin
           system_scaling_maxconnectioncount: 100
         ports:
-          - 55554:55555
+          - 55555:55555
     strategy:
       matrix:
         include:
@@ -64,6 +64,6 @@ jobs:
       - run: cargo test -- --ignored
         env:
           SOLACE_HOST: solace
-          SOLACE_PORT: 55554
+          SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
       - run: cd solace-rs-sys && cargo test
 
