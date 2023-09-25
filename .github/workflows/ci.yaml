@@ -63,7 +63,7 @@ jobs:
       - run: cargo test
       - run: cargo test -- --ignored
         env:
-          SOLACE_HOST: solace
+          SOLACE_HOST: 0.0.0.0
           SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
       - run: cd solace-rs-sys && cargo test
 
