@@ -4,7 +4,7 @@ version: '3.3'
 services:
   primary:
     container_name: pubSubStandardSingleNode
-    image: solace/solace-pubsub-standard:latest
+    image: solace/solace-pubsub-standard:10.5
     shm_size: 1g
     ulimits:
       core: 2

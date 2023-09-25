@@ -23,6 +23,15 @@ jobs:
       - run: cargo test --doc
 
   test:
+    services:
+      solace:
+        image: solace/solace-pubsub-standard:10.5
+        env: 
+          username_admin_globalaccesslevel: admin
+          username_admin_password: admin
+          system_scaling_maxconnectioncount: 100
+        ports:
+          - 55554:55555
     strategy:
       matrix:
         include:
@@ -36,5 +45,6 @@ jobs:
           toolchain: ${{ env.rust_version }}
       - run: cargo build --all-targets --verbose
       - run: cargo test
+      - run: cargo test -- --ignored
       - run: cd solace-rs-sys && cargo test
 
