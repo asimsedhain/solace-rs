@@ -19,6 +19,9 @@ static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
 #[test]
 #[ignore]
 fn subscribe_and_publish() {
+    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
+    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
@@ -33,7 +36,7 @@ fn subscribe_and_publish() {
 
     let session = solace_context
         .session(
-            "tcp://localhost:55554",
+            format!("tcp://{}:{}", host, port),
             "default",
             "default",
             "",
@@ -79,6 +82,8 @@ fn subscribe_and_publish() {
 #[test]
 #[ignore]
 fn multi_subscribe_and_publish() {
+    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
+    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
     let msg_multiplier = 2;
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
@@ -89,7 +94,7 @@ fn multi_subscribe_and_publish() {
 
     let session0 = solace_context
         .session(
-            "tcp://localhost:55554",
+            format!("tcp://{}:{}", host, port),
             "default",
             "default",
             "",
@@ -106,7 +111,7 @@ fn multi_subscribe_and_publish() {
 
     let session1 = solace_context
         .session(
-            "tcp://localhost:55554",
+            format!("tcp://{}:{}", host, port),
             "default",
             "default",
             "",
@@ -173,6 +178,9 @@ fn multi_subscribe_and_publish() {
 #[test]
 #[ignore]
 fn unsubscribe_and_publish() {
+    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
+    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
@@ -187,7 +195,7 @@ fn unsubscribe_and_publish() {
 
     let session = solace_context
         .session(
-            "tcp://localhost:55554",
+            format!("tcp://{}:{}", host, port),
             "default",
             "default",
             "",
@@ -252,6 +260,9 @@ fn unsubscribe_and_publish() {
 #[test]
 #[ignore]
 fn multi_thread_publisher() {
+    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
+    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+
     let msg_multiplier = 3;
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
@@ -269,7 +280,7 @@ fn multi_thread_publisher() {
     let session = Arc::new(
         solace_context
             .session(
-                "tcp://localhost:55554",
+                format!("tcp://{}:{}", host, port),
                 "default",
                 "default",
                 "",

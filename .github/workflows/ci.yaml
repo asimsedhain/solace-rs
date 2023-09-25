@@ -62,5 +62,8 @@ jobs:
       - run: cargo build --all-targets --verbose
       - run: cargo test
       - run: cargo test -- --ignored
+        env:
+          SOLACE_HOST: solace
+          SOLACE_PORT: 55554
       - run: cd solace-rs-sys && cargo test
 
