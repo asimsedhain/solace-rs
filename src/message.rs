@@ -14,6 +14,7 @@ use std::mem::size_of;
 use std::ptr;
 
 // the below assertions makes sure that u32 can always be converted into usize safely.
+#[allow(dead_code)]
 const ASSERT_USIZE_IS_AT_LEAST_U32: () = assert!(size_of::<u32>() <= size_of::<usize>());
 
 enum_from_primitive! {
