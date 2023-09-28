@@ -205,4 +205,31 @@ pub trait Message<'a> {
 
         Ok(Some(MessageDestination::from(dest_struct)))
     }
+
+    fn get_user_data(&'a self) -> Result<Option<&'a [u8]>> {
+        let mut buffer = ptr::null_mut();
+        let mut buffer_len: u32 = 0;
+
+        let msg_ops_result = unsafe {
+            ffi::solClient_msg_getUserDataPtr(
+                self.get_raw_message_ptr(),
+                &mut buffer,
+                &mut buffer_len,
+            )
+        };
+
+        match SolClientReturnCode::from_i32(msg_ops_result) {
+            Some(SolClientReturnCode::Ok) => (),
+            Some(SolClientReturnCode::NotFound) => return Ok(None),
+            _ => return Err(SolaceError),
+        }
+
+        // the compile time check ASSERT_USIZE_IS_AT_LEAST_U32 guarantees that this conversion is
+        // possible
+        let buf_len = buffer_len.try_into().unwrap();
+
+        let safe_slice = unsafe { std::slice::from_raw_parts(buffer as *const u8, buf_len) };
+
+        Ok(Some(safe_slice))
+    }
 }

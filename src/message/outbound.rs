@@ -14,6 +14,8 @@ pub enum MessageBuilderError {
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
     MissingRequiredArgs(String),
+    #[error("{0} size need to be less than {1} found {2}")]
+    SizeErrorArgs(String, usize, usize),
     #[error("solClient returned not ok code")]
     SolClientError,
     #[error("solClient message aloc failed")]
@@ -52,6 +54,7 @@ pub struct OutboundMessageBuilder {
     priority: Option<u8>,
     application_id: Option<Vec<u8>>,
     application_msg_type: Option<Vec<u8>>,
+    user_data: Option<Vec<u8>>,
 }
 
 impl OutboundMessageBuilder {
@@ -97,6 +100,15 @@ impl OutboundMessageBuilder {
 
     pub fn priority(mut self, priority: u8) -> Self {
         self.priority = Some(priority);
+        self
+    }
+
+    pub fn user_data<D>(mut self, data: D) -> Self
+    where
+        D: Into<Vec<u8>>,
+    {
+        self.user_data = Some(data.into());
+
         self
     }
 
@@ -169,7 +181,31 @@ impl OutboundMessageBuilder {
             )
         };
 
-        // binary attachment string
+        if let Some(user_data) = self.user_data {
+            if user_data.len()
+                > ffi::SOLCLIENT_BUFINFO_MAX_USER_DATA_SIZE
+                    .try_into()
+                    .unwrap()
+            {
+                return Err(MessageBuilderError::SizeErrorArgs(
+                    "user_data".to_owned(),
+                    user_data.len(),
+                    ffi::SOLCLIENT_BUFINFO_MAX_USER_DATA_SIZE
+                        .try_into()
+                        .unwrap(),
+                ));
+            }
+            // We pass the ptr which is then copied over
+            unsafe {
+                ffi::solClient_msg_setUserData(
+                    msg_ptr,
+                    user_data.as_ptr() as *const c_void,
+                    user_data.len() as u32,
+                )
+            };
+        }
+
+        // binary attachment
         // We pass the ptr which is then copied over
         let Some(message) = self.message else {
             return Err(MessageBuilderError::MissingRequiredArgs(
@@ -400,5 +436,21 @@ mod tests {
         let raw_payload = message.get_payload().unwrap().unwrap();
 
         assert!(b"Hello" == raw_payload);
+    }
+
+    #[test]
+    fn it_should_build_with_same_user_data() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let message = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .user_data(32_u32.to_be_bytes())
+            .build()
+            .unwrap();
+
+        let raw_user_data = message.get_user_data().unwrap().unwrap();
+
+        assert!(32_u32.to_be_bytes() == raw_user_data);
     }
 }
