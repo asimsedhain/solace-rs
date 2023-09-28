@@ -134,18 +134,23 @@ pub trait Message<'a> {
         Ok(cos)
     }
 
-    fn get_correlation_id(&'a self) -> Result<&'a str> {
+    fn get_correlation_id(&'a self) -> Result<Option<&'a str>> {
         let mut buffer = ptr::null();
 
         let msg_ops_result =
             unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
 
-        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SolaceError);
+        match SolClientReturnCode::from_i32(msg_ops_result) {
+            Some(SolClientReturnCode::Ok) => (),
+            Some(SolClientReturnCode::NotFound) => return Ok(None),
+            _ => return Err(SolaceError),
         }
 
         let c_str = unsafe { CStr::from_ptr(buffer) };
-        return c_str.to_str().map_err(|_| SolaceError);
+
+        let str = c_str.to_str().map_err(|_| SolaceError)?;
+
+        Ok(Some(str))
     }
 
     fn get_expiration(&'a self) -> i64 {

@@ -1,16 +1,20 @@
 use super::Message;
-use crate::SolClientReturnCode;
+use crate::{Result, SolClientReturnCode, SolaceError};
 use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::convert::From;
+use std::ffi::CStr;
+use std::marker::PhantomData;
+use std::ptr;
 use std::time::SystemTime;
 use tracing::warn;
 
-pub struct InboundMessage {
+pub struct InboundMessage<'a> {
     msg_ptr: ffi::solClient_opaqueMsg_pt,
+    _phantom: PhantomData<&'a u8>,
 }
 
-impl Drop for InboundMessage {
+impl Drop for InboundMessage<'_> {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
@@ -19,7 +23,7 @@ impl Drop for InboundMessage {
     }
 }
 
-impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
+impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage<'_> {
     /// .
     ///
     /// # Safety
@@ -30,17 +34,20 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
     ///
     /// .
     fn from(ptr: ffi::solClient_opaqueMsg_pt) -> Self {
-        Self { msg_ptr: ptr }
+        Self {
+            msg_ptr: ptr,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<'a> Message<'a> for InboundMessage {
+impl<'a> Message<'a> for InboundMessage<'a> {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
         self.msg_ptr
     }
 }
 
-impl InboundMessage {
+impl<'a> InboundMessage<'a> {
     pub fn get_receive_timestamp(&self) -> SystemTime {
         todo!()
     }
@@ -49,11 +56,33 @@ impl InboundMessage {
         todo!()
     }
 
-    pub fn get_sender_id(&self) -> String {
-        todo!()
+    pub fn get_sender_id(&'a self) -> Result<Option<&'a str>> {
+        let mut buffer = ptr::null();
+
+        let msg_ops_result =
+            unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
+
+        match SolClientReturnCode::from_i32(msg_ops_result) {
+            Some(SolClientReturnCode::Ok) => (),
+            Some(SolClientReturnCode::NotFound) => return Ok(None),
+            _ => return Err(SolaceError),
+        }
+
+        let c_str = unsafe { CStr::from_ptr(buffer) };
+
+        let str = c_str.to_str().map_err(|_| SolaceError)?;
+
+        Ok(Some(str))
     }
 
     pub fn is_discard_indication(&self) -> bool {
-        todo!()
+        let discard_indication =
+            unsafe { ffi::solClient_msg_isDiscardIndication(self.get_raw_message_ptr()) };
+
+        if discard_indication == 0 {
+            return false;
+        }
+
+        true
     }
 }

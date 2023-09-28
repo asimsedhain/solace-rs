@@ -305,7 +305,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let correlation_id = message.get_correlation_id().unwrap();
+        let correlation_id = message.get_correlation_id().unwrap().unwrap();
 
         assert!("test_correlation" == correlation_id);
     }
