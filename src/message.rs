@@ -10,7 +10,11 @@ pub use outbound::{OutboundMessage, OutboundMessageBuilder};
 use solace_rs_sys as ffi;
 use std::ffi::CStr;
 use std::mem;
+use std::mem::size_of;
 use std::ptr;
+
+// the below assertions makes sure that u32 can always be converted into usize safely.
+const ASSERT_USIZE_IS_AT_LEAST_U32: () = assert!(size_of::<u32>() <= size_of::<usize>());
 
 enum_from_primitive! {
     #[derive(Debug, PartialEq, Eq)]
@@ -70,8 +74,8 @@ pub trait Message<'a> {
             return Err(SolaceError);
         }
 
-        // not supported if u32 cannot be converted to usize
-        // maybe we can add a check at compile time?
+        // the compile time check ASSERT_USIZE_IS_AT_LEAST_U32 guarantees that this conversion is
+        // possible
         let buf_len = buffer_len.try_into().unwrap();
 
         let safe_slice = unsafe { std::slice::from_raw_parts(buffer as *const u8, buf_len) };
