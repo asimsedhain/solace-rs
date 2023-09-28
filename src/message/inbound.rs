@@ -6,7 +6,7 @@ use std::convert::From;
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::ptr;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tracing::warn;
 
 pub struct InboundMessage<'a> {
@@ -48,12 +48,18 @@ impl<'a> Message<'a> for InboundMessage<'a> {
 }
 
 impl<'a> InboundMessage<'a> {
-    pub fn get_receive_timestamp(&self) -> SystemTime {
-        todo!()
-    }
+    pub fn get_receive_timestamp(&self) -> Result<Option<SystemTime>> {
+        let mut ts: i64 = 0;
+        let op_result =
+            unsafe { ffi::solClient_msg_getRcvTimestamp(self.get_raw_message_ptr(), &mut ts) };
 
-    pub fn get_sender_timestamp(&self) -> SystemTime {
-        todo!()
+        match SolClientReturnCode::from_i32(op_result) {
+            Some(SolClientReturnCode::NotFound) => Ok(None),
+            Some(SolClientReturnCode::Ok) => Ok(Some(
+                SystemTime::UNIX_EPOCH + Duration::from_millis(ts.try_into().unwrap()),
+            )),
+            _ => Err(SolaceError),
+        }
     }
 
     pub fn get_sender_id(&'a self) -> Result<Option<&'a str>> {

@@ -12,6 +12,7 @@ use std::ffi::CStr;
 use std::mem;
 use std::mem::size_of;
 use std::ptr;
+use std::time::{Duration, SystemTime};
 
 // the below assertions makes sure that u32 can always be converted into usize safely.
 #[allow(dead_code)]
@@ -210,6 +211,20 @@ pub trait Message<'a> {
         }
 
         Ok(Some(MessageDestination::from(dest_struct)))
+    }
+
+    fn get_sender_timestamp(&'a self) -> Result<Option<SystemTime>> {
+        let mut ts: i64 = 0;
+        let op_result =
+            unsafe { ffi::solClient_msg_getSenderTimestamp(self.get_raw_message_ptr(), &mut ts) };
+
+        match SolClientReturnCode::from_i32(op_result) {
+            Some(SolClientReturnCode::NotFound) => Ok(None),
+            Some(SolClientReturnCode::Ok) => Ok(Some(
+                SystemTime::UNIX_EPOCH + Duration::from_millis(ts.try_into().unwrap()),
+            )),
+            _ => Err(SolaceError),
+        }
     }
 
     fn get_user_data(&'a self) -> Result<Option<&'a [u8]>> {

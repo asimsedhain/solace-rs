@@ -5,6 +5,7 @@ use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::ffi::{c_void, CString, NulError};
 use std::ptr;
+use std::time::SystemTime;
 use thiserror::Error;
 use tracing::warn;
 
@@ -16,6 +17,8 @@ pub enum MessageBuilderError {
     MissingRequiredArgs(String),
     #[error("{0} size need to be less than {1} found {2}")]
     SizeErrorArgs(String, usize, usize),
+    #[error("timestamp needs to be greater than UNIX_EPOCH")]
+    TimestampError,
     #[error("solClient returned not ok code")]
     SolClientError,
     #[error("solClient message aloc failed")]
@@ -55,6 +58,7 @@ pub struct OutboundMessageBuilder {
     application_id: Option<Vec<u8>>,
     application_msg_type: Option<Vec<u8>>,
     user_data: Option<Vec<u8>>,
+    sender_ts: Option<SystemTime>,
 }
 
 impl OutboundMessageBuilder {
@@ -95,6 +99,11 @@ impl OutboundMessageBuilder {
 
     pub fn seq_number(mut self, seq_num: u64) -> Self {
         self.seq_number = Some(seq_num);
+        self
+    }
+
+    pub fn sender_timestamp(mut self, ts: SystemTime) -> Self {
+        self.sender_ts = Some(ts);
         self
     }
 
@@ -239,6 +248,19 @@ impl OutboundMessageBuilder {
         // Priority
         if let Some(priority) = self.priority {
             unsafe { ffi::solClient_msg_setPriority(msg_ptr, priority.into()) };
+        }
+
+        // Sender timestamp
+        if let Some(ts) = self.sender_ts {
+            let ts = ts
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_err(|_| MessageBuilderError::TimestampError)?;
+            let ts: i64 = ts
+                .as_millis()
+                .try_into()
+                .map_err(|_| MessageBuilderError::TimestampError)?;
+
+            unsafe { ffi::solClient_msg_setSenderTimestamp(msg_ptr, ts) };
         }
 
         // Application ID
@@ -452,5 +474,31 @@ mod tests {
         let raw_user_data = message.get_user_data().unwrap().unwrap();
 
         assert!(32_u32.to_be_bytes() == raw_user_data);
+    }
+
+    #[test]
+    fn it_should_build_with_same_sender_timestamp() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let now = SystemTime::now();
+        let message = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .sender_timestamp(now)
+            .build()
+            .unwrap();
+
+        let ts = message.get_sender_timestamp().unwrap().unwrap();
+
+        let now = now
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let ts = ts
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
+        assert!(now == ts);
     }
 }
