@@ -15,7 +15,7 @@ fn main() {
     println!("Context created");
 
     let on_message = move |message: InboundMessage| {
-        let Ok(payload) = message.get_payload() else {
+        let Ok(Some(payload)) = message.get_payload() else {
             println!("on_message handler could not decode bytes");
             return;
         };

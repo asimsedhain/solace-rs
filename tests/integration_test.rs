@@ -28,7 +28,7 @@ fn subscribe_and_publish() {
     let topic = "publish_and_receive";
 
     let on_message = move |message: InboundMessage| {
-        let Ok(payload) = message.get_payload() else {
+        let Ok(Some(payload)) = message.get_payload() else {
             return;
         };
         let _ = tx.send(payload.to_owned());
@@ -72,7 +72,7 @@ fn subscribe_and_publish() {
                     break;
                 }
             }
-            Err(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -99,7 +99,7 @@ fn multi_subscribe_and_publish() {
             "default",
             "",
             Some(move |message: InboundMessage| {
-                let Ok(payload) = message.get_payload() else {
+                let Ok(Some(payload)) = message.get_payload() else {
                     return;
                 };
                 let _ = tx0.send(payload.to_owned());
@@ -116,7 +116,7 @@ fn multi_subscribe_and_publish() {
             "default",
             "",
             Some(move |message: InboundMessage| {
-                let Ok(payload) = message.get_payload() else {
+                let Ok(Some(payload)) = message.get_payload() else {
                     return;
                 };
                 let _ = tx1.send(payload.to_owned());
@@ -152,7 +152,7 @@ fn multi_subscribe_and_publish() {
                     break;
                 }
             }
-            Err(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -187,7 +187,7 @@ fn unsubscribe_and_publish() {
     let topic = "unsubscribe_and_publish";
 
     let on_message = move |message: InboundMessage| {
-        let Ok(payload) = message.get_payload() else {
+        let Ok(Some(payload)) = message.get_payload() else {
             return;
         };
         let _ = tx.send(payload.to_owned());
@@ -233,7 +233,7 @@ fn unsubscribe_and_publish() {
                     break;
                 }
             }
-            Err(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -271,7 +271,7 @@ fn multi_thread_publisher() {
     let topic = "multi_thread_publisher";
 
     let on_message = move |message: InboundMessage| {
-        let Ok(payload) = message.get_payload() else {
+        let Ok(Some(payload)) = message.get_payload() else {
             return;
         };
         let _ = tx.send(payload.to_owned());
@@ -327,7 +327,7 @@ fn multi_thread_publisher() {
                     break;
                 }
             }
-            Err(_) => panic!(),
+            _ => panic!(),
         }
     }
 

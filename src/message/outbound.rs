@@ -397,7 +397,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let raw_payload = message.get_payload().unwrap();
+        let raw_payload = message.get_payload().unwrap().unwrap();
 
         assert!(b"Hello" == raw_payload);
     }

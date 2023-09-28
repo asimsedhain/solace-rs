@@ -58,7 +58,7 @@ pub trait Message<'a> {
     /// .
     unsafe fn get_raw_message_ptr(&'a self) -> ffi::solClient_opaqueMsg_pt;
 
-    fn get_payload(&'a self) -> Result<&'a [u8]> {
+    fn get_payload(&'a self) -> Result<Option<&'a [u8]>> {
         let mut buffer = ptr::null_mut();
         let mut buffer_len: u32 = 0;
 
@@ -70,8 +70,10 @@ pub trait Message<'a> {
             )
         };
 
-        if SolClientReturnCode::from_i32(msg_ops_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SolaceError);
+        match SolClientReturnCode::from_i32(msg_ops_result) {
+            Some(SolClientReturnCode::Ok) => (),
+            Some(SolClientReturnCode::NotFound) => return Ok(None),
+            _ => return Err(SolaceError),
         }
 
         // the compile time check ASSERT_USIZE_IS_AT_LEAST_U32 guarantees that this conversion is
@@ -80,7 +82,7 @@ pub trait Message<'a> {
 
         let safe_slice = unsafe { std::slice::from_raw_parts(buffer as *const u8, buf_len) };
 
-        Ok(safe_slice)
+        Ok(Some(safe_slice))
     }
 
     fn get_application_message_id(&'a self) -> Option<&'a str> {
