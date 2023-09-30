@@ -82,7 +82,7 @@ impl CacheSession {
         })
     }
 
-    pub fn blocking_cache_request<T>(self, topic: T, request_id: u64) -> Result<(), SessionError>
+    pub fn blocking_cache_request<T>(&self, topic: T, request_id: u64) -> Result<(), SessionError>
     where
         T: Into<Vec<u8>>,
     {
