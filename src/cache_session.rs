@@ -16,6 +16,9 @@ pub struct CacheSession {
     pub(crate) session: Session,
 }
 
+unsafe impl Send for CacheSession {}
+unsafe impl Sync for CacheSession {}
+
 impl Deref for CacheSession {
     type Target = Session;
 
