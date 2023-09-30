@@ -28,12 +28,14 @@ pub enum MessageBuilderError {
 type Result<T> = std::result::Result<T, MessageBuilderError>;
 
 pub struct OutboundMessage {
-    msg_ptr: ffi::solClient_opaqueMsg_pt,
+    _msg_ptr: ffi::solClient_opaqueMsg_pt,
 }
+
+unsafe impl Send for OutboundMessage {}
 
 impl Drop for OutboundMessage {
     fn drop(&mut self) {
-        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
+        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
             warn!("message was not dropped properly");
         }
@@ -42,7 +44,7 @@ impl Drop for OutboundMessage {
 
 impl<'a> Message<'a> for OutboundMessage {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
-        self.msg_ptr
+        self._msg_ptr
     }
 }
 
@@ -282,7 +284,7 @@ impl OutboundMessageBuilder {
             };
         }
 
-        Ok(OutboundMessage { msg_ptr })
+        Ok(OutboundMessage { _msg_ptr: msg_ptr })
     }
 }
 

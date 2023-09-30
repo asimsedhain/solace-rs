@@ -10,13 +10,15 @@ use std::time::{Duration, SystemTime};
 use tracing::warn;
 
 pub struct InboundMessage<'a> {
-    msg_ptr: ffi::solClient_opaqueMsg_pt,
+    _msg_ptr: ffi::solClient_opaqueMsg_pt,
     _phantom: PhantomData<&'a u8>,
 }
 
+unsafe impl Send for InboundMessage<'_> {}
+
 impl Drop for InboundMessage<'_> {
     fn drop(&mut self) {
-        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self.msg_ptr) };
+        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
         if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
             warn!("warning: message was not dropped properly");
         }
@@ -35,7 +37,7 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage<'_> {
     /// .
     fn from(ptr: ffi::solClient_opaqueMsg_pt) -> Self {
         Self {
-            msg_ptr: ptr,
+            _msg_ptr: ptr,
             _phantom: PhantomData,
         }
     }
@@ -43,7 +45,7 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage<'_> {
 
 impl<'a> Message<'a> for InboundMessage<'a> {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
-        self.msg_ptr
+        self._msg_ptr
     }
 }
 
