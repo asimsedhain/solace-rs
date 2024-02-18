@@ -9,33 +9,33 @@ use solace_rs_sys as ffi;
 
 use crate::{Session, SessionError, SolClientReturnCode};
 
-pub struct CacheSession {
+pub struct CacheSession<'session> {
     // Pointer to session
     // This pointer must never be allowed to leave the struct
     pub(crate) _cache_session_pt: ffi::solClient_opaqueCacheSession_pt,
-    pub(crate) session: Session,
+    pub(crate) session: Session<'session>,
 }
 
-unsafe impl Send for CacheSession {}
-unsafe impl Sync for CacheSession {}
+unsafe impl Send for CacheSession<'_> {}
+unsafe impl Sync for CacheSession<'_> {}
 
-impl Deref for CacheSession {
-    type Target = Session;
+impl<'session> Deref for CacheSession<'session> {
+    type Target = Session<'session>;
 
     fn deref(&self) -> &Self::Target {
         &self.session
     }
 }
 
-impl DerefMut for CacheSession {
+impl DerefMut for CacheSession<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.session
     }
 }
 
-impl CacheSession {
+impl<'session> CacheSession<'session> {
     pub(crate) fn new<N>(
-        session: Session,
+        session: Session<'session>,
         cache_name: N,
         max_message: Option<u64>,
         max_age: Option<u64>,

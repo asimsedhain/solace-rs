@@ -3,6 +3,7 @@ use crate::SessionError;
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
+use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 use tracing::warn;
@@ -113,7 +114,7 @@ impl Context {
         })
     }
 
-    pub fn session<H, V, U, P, M, E>(
+    pub fn session<'session, H, V, U, P, M, E>(
         &self,
         host_name: H,
         vpn_name: V,
@@ -121,14 +122,14 @@ impl Context {
         password: P,
         on_message: Option<M>,
         on_event: Option<E>,
-    ) -> std::result::Result<Session, SessionError>
+    ) -> std::result::Result<Session<'session>, SessionError>
     where
         H: Into<Vec<u8>>,
         V: Into<Vec<u8>>,
         U: Into<Vec<u8>>,
         P: Into<Vec<u8>>,
-        M: FnMut(InboundMessage) + Send + 'static,
-        E: FnMut(SessionEvent) + Send + 'static,
+        M: FnMut(InboundMessage) + Send + 'session,
+        E: FnMut(SessionEvent) + Send + 'session,
     {
         /* Session */
         //solClient_opaqueSession_pt session_p;
@@ -218,6 +219,7 @@ impl Context {
             Ok(Session {
                 _session_pt: session_pt,
                 context: self.clone(),
+                lifetime: PhantomData,
             })
         } else {
             Err(SessionError::ConnectionFailure)

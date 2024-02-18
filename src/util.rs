@@ -5,21 +5,21 @@ use crate::message::InboundMessage;
 use solace_rs_sys as ffi;
 use std::mem;
 
-pub fn on_message_trampoline<F>(_closure: &F) -> ffi::solClient_session_rxMsgCallbackFunc_t
+pub fn on_message_trampoline<'s, F>(_closure: &'s F) -> ffi::solClient_session_rxMsgCallbackFunc_t
 where
-    F: FnMut(InboundMessage) + Send + 'static,
+    F: FnMut(InboundMessage) + Send + 's,
 {
     Some(static_on_message::<F>)
 }
 
-pub fn on_event_trampoline<F>(_closure: &F) -> ffi::solClient_session_eventCallbackFunc_t
+pub fn on_event_trampoline<'s, F>(_closure: &'s F) -> ffi::solClient_session_eventCallbackFunc_t
 where
-    F: FnMut(SessionEvent) + Send + 'static,
+    F: FnMut(SessionEvent) + Send + 's,
 {
     Some(static_on_event::<F>)
 }
 
-extern "C" fn static_on_message<F>(
+extern "C" fn static_on_message<'s, F>(
     _opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
     msg_p: ffi::solClient_opaqueMsg_pt,                 // non-null
     raw_user_closure: *mut ::std::os::raw::c_void,      // can be null
@@ -28,7 +28,7 @@ where
     // not completely sure if this is supposed to be FnMut or FnOnce
     // threading takes in FnOnce - that is why I suspect it might be FnOnce.
     // But not enough knowledge to make sure it is FnOnce.
-    F: FnMut(InboundMessage) + Send + 'static,
+    F: FnMut(InboundMessage) + Send + 's,
 {
     // this function is glue code to allow users to pass in closures
     // we duplicate the message pointer (which does not copy over the binary data)
@@ -48,12 +48,12 @@ where
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_TAKE_MSG
 }
 
-extern "C" fn static_on_event<F>(
+extern "C" fn static_on_event<'s, F>(
     _opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
     event_info_p: ffi::solClient_session_eventCallbackInfo_pt, //non-null
     raw_user_closure: *mut ::std::os::raw::c_void,      // can be null
 ) where
-    F: FnMut(SessionEvent),
+    F: FnMut(SessionEvent) + Send + 's,
 {
     let non_null_raw_user_closure = std::ptr::NonNull::new(raw_user_closure);
 
