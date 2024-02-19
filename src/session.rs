@@ -6,11 +6,14 @@ use crate::SolClientReturnCode;
 use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::ffi::CString;
+use std::marker::PhantomData;
 use tracing::warn;
 
 type Result<T> = std::result::Result<T, SessionError>;
 
-pub struct Session {
+pub struct Session<'session> {
+    pub(crate) lifetime: PhantomData<&'session ()>,
+
     // Pointer to session
     // This pointer must never be allowed to leave the struct
     pub(crate) _session_pt: ffi::solClient_opaqueSession_pt,
@@ -20,10 +23,10 @@ pub struct Session {
     pub(crate) context: Context,
 }
 
-unsafe impl Send for Session {}
-unsafe impl Sync for Session {}
+unsafe impl Send for Session<'_> {}
+unsafe impl Sync for Session<'_> {}
 
-impl Session {
+impl<'session> Session<'session> {
     pub fn publish(&self, message: OutboundMessage) -> Result<()> {
         let send_message_result = unsafe {
             ffi::solClient_session_sendMsg(self._session_pt, message.get_raw_message_ptr())
@@ -74,7 +77,7 @@ impl Session {
         max_message: Option<u64>,
         max_age: Option<u64>,
         timeout_ms: Option<u64>,
-    ) -> Result<CacheSession>
+    ) -> Result<CacheSession<'session>>
     where
         N: Into<Vec<u8>>,
     {
@@ -82,7 +85,7 @@ impl Session {
     }
 }
 
-impl Drop for Session {
+impl Drop for Session<'_> {
     fn drop(&mut self) {
         let session_free_result = unsafe { ffi::solClient_session_destroy(&mut self._session_pt) };
         if SolClientReturnCode::from_i32(session_free_result) != Some(SolClientReturnCode::Ok) {
