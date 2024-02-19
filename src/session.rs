@@ -28,13 +28,14 @@ unsafe impl Sync for Session<'_> {}
 
 impl<'session> Session<'session> {
     pub fn publish(&self, message: OutboundMessage) -> Result<()> {
-        let send_message_result = unsafe {
+        let send_message_raw_rc = unsafe {
             ffi::solClient_session_sendMsg(self._session_pt, message.get_raw_message_ptr())
         };
-        assert_eq!(
-            SolClientReturnCode::from_i32(send_message_result),
-            Some(SolClientReturnCode::Ok)
-        );
+
+        let rc = SolClientReturnCode::from_raw(send_message_raw_rc);
+        if !rc.is_ok() {
+            return Err(SessionError::PublishError(rc));
+        }
 
         Ok(())
     }
@@ -44,12 +45,15 @@ impl<'session> Session<'session> {
         T: Into<Vec<u8>>,
     {
         let c_topic = CString::new(topic)?;
-        let subscription_result =
+        let subscription_raw_rc =
             unsafe { ffi::solClient_session_topicSubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(subscription_raw_rc);
+
+        if !rc.is_ok() {
             return Err(SessionError::SubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),
+                rc,
             ));
         }
         Ok(())
@@ -60,12 +64,15 @@ impl<'session> Session<'session> {
         T: Into<Vec<u8>>,
     {
         let c_topic = CString::new(topic)?;
-        let subscription_result =
+        let subscription_raw_rc =
             unsafe { ffi::solClient_session_topicUnsubscribe(self._session_pt, c_topic.as_ptr()) };
 
-        if SolClientReturnCode::from_i32(subscription_result) != Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(subscription_raw_rc);
+
+        if !rc.is_ok() {
             return Err(SessionError::UnsubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),
+                rc,
             ));
         }
         Ok(())
@@ -88,8 +95,10 @@ impl<'session> Session<'session> {
 impl Drop for Session<'_> {
     fn drop(&mut self) {
         let session_free_result = unsafe { ffi::solClient_session_destroy(&mut self._session_pt) };
-        if SolClientReturnCode::from_i32(session_free_result) != Some(SolClientReturnCode::Ok) {
-            warn!("session was not dropped properly");
+        let rc = SolClientReturnCode::from_raw(session_free_result);
+
+        if !rc.is_ok() {
+            warn!("session was not dropped properly. {rc}");
         }
     }
 }
