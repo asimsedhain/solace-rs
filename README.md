@@ -55,7 +55,7 @@ SOLCLIENT_TARBALL_URL=link_to_c_library_tar_ball
 
 ## Examples
 
-You can find examples in the [examples folder](./examples). To run them:
+You can find examples in the [examples folder](./examples). The examples assume you have solace running on `localhost:55554`. To run them:
 
 ```bash
 cargo run --example <example_name> -- <example_args>
