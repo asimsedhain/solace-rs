@@ -16,11 +16,14 @@ use solace_rs::{
 
 static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
 
+const DEFAULT_HOST: &str = "worker-lenovo-yoga";
+const DEFAULT_PORT: &str = "55555";
+
 #[test]
 #[ignore]
 fn subscribe_and_publish() {
-    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
-    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
@@ -82,8 +85,8 @@ fn subscribe_and_publish() {
 #[test]
 #[ignore]
 fn multi_subscribe_and_publish() {
-    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
-    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
     let msg_multiplier = 2;
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
@@ -178,8 +181,8 @@ fn multi_subscribe_and_publish() {
 #[test]
 #[ignore]
 fn unsubscribe_and_publish() {
-    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
-    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
 
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
@@ -260,8 +263,8 @@ fn unsubscribe_and_publish() {
 #[test]
 #[ignore]
 fn multi_thread_publisher() {
-    let host = option_env!("SOLACE_HOST").unwrap_or("localhost");
-    let port = option_env!("SOLACE_PORT").unwrap_or("55554");
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
 
     let msg_multiplier = 3;
 
