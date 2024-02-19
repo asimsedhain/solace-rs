@@ -2,7 +2,7 @@ pub mod destination;
 pub mod inbound;
 pub mod outbound;
 
-use crate::{Result, SolClientReturnCode, SolaceError};
+use crate::SolClientReturnCode;
 pub use destination::{DestinationType, MessageDestination};
 use enum_primitive::*;
 pub use inbound::InboundMessage;
@@ -13,6 +13,7 @@ use std::mem;
 use std::mem::size_of;
 use std::ptr;
 use std::time::{Duration, SystemTime};
+use thiserror::Error;
 
 // the below assertions makes sure that u32 can always be converted into usize safely.
 #[allow(dead_code)]
@@ -48,6 +49,16 @@ impl From<ClassOfService> for u32 {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum MessageError {
+    #[error("failed to get field. SolClient return code: {0}")]
+    FieldError(&'static str, SolClientReturnCode),
+    #[error("failed to convert field from solace")]
+    FieldConvertionError(&'static str),
+}
+
+type Result<T> = std::result::Result<T, MessageError>;
+
 pub trait Message<'a> {
     /// .
     ///
@@ -64,7 +75,7 @@ pub trait Message<'a> {
         let mut buffer = ptr::null_mut();
         let mut buffer_len: u32 = 0;
 
-        let msg_ops_result = unsafe {
+        let msg_ops_rc = unsafe {
             ffi::solClient_msg_getBinaryAttachmentPtr(
                 self.get_raw_message_ptr(),
                 &mut buffer,
@@ -72,10 +83,11 @@ pub trait Message<'a> {
             )
         };
 
-        match SolClientReturnCode::from_i32(msg_ops_result) {
-            Some(SolClientReturnCode::Ok) => (),
-            Some(SolClientReturnCode::NotFound) => return Ok(None),
-            _ => return Err(SolaceError),
+        let rc = SolClientReturnCode::from_raw(msg_ops_rc);
+        match rc {
+            SolClientReturnCode::Ok => (),
+            SolClientReturnCode::NotFound => return Ok(None),
+            _ => return Err(MessageError::FieldError("payload", rc)),
         }
 
         // the compile time check ASSERT_USIZE_IS_AT_LEAST_U32 guarantees that this conversion is
@@ -90,11 +102,13 @@ pub trait Message<'a> {
     fn get_application_message_id(&'a self) -> Option<&'a str> {
         let mut buffer = ptr::null();
 
-        let op_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_msg_getApplicationMessageId(self.get_raw_message_ptr(), &mut buffer)
         };
 
-        if SolClientReturnCode::from_i32(op_result) != Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
             return None;
         }
 
@@ -106,11 +120,13 @@ pub trait Message<'a> {
     fn get_application_msg_type(&'a self) -> Option<&'a str> {
         let mut buffer = ptr::null();
 
-        let op_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_msg_getApplicationMsgType(self.get_raw_message_ptr(), &mut buffer)
         };
 
-        if SolClientReturnCode::from_i32(op_result) != Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
             return None;
         }
 
@@ -121,15 +137,16 @@ pub trait Message<'a> {
 
     fn get_class_of_service(&'a self) -> Result<ClassOfService> {
         let mut cos: u32 = 0;
-        let cos_result =
+        let rc =
             unsafe { ffi::solClient_msg_getClassOfService(self.get_raw_message_ptr(), &mut cos) };
 
-        if SolClientReturnCode::from_i32(cos_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SolaceError);
+        let rc = SolClientReturnCode::from_raw(rc);
+        if !rc.is_ok() {
+            return Err(MessageError::FieldError("ClassOfService", rc));
         }
 
         let Some(cos) = ClassOfService::from_u32(cos) else {
-            return Err(SolaceError);
+            return Err(MessageError::FieldConvertionError("ClassOfService"));
         };
 
         Ok(cos)
@@ -138,18 +155,21 @@ pub trait Message<'a> {
     fn get_correlation_id(&'a self) -> Result<Option<&'a str>> {
         let mut buffer = ptr::null();
 
-        let msg_ops_result =
+        let rc =
             unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
 
-        match SolClientReturnCode::from_i32(msg_ops_result) {
-            Some(SolClientReturnCode::Ok) => (),
-            Some(SolClientReturnCode::NotFound) => return Ok(None),
-            _ => return Err(SolaceError),
+        let rc = SolClientReturnCode::from_raw(rc);
+        match rc {
+            SolClientReturnCode::Ok => (),
+            SolClientReturnCode::NotFound => return Ok(None),
+            _ => return Err(MessageError::FieldError("correlation_id", rc)),
         }
 
         let c_str = unsafe { CStr::from_ptr(buffer) };
 
-        let str = c_str.to_str().map_err(|_| SolaceError)?;
+        let str = c_str
+            .to_str()
+            .map_err(|_| MessageError::FieldConvertionError("correlation_id"))?;
 
         Ok(Some(str))
     }
@@ -163,11 +183,12 @@ pub trait Message<'a> {
 
     fn get_priority(&'a self) -> Result<Option<u8>> {
         let mut priority: i32 = 0;
-        let op_result =
+        let rc =
             unsafe { ffi::solClient_msg_getPriority(self.get_raw_message_ptr(), &mut priority) };
 
-        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(op_result) {
-            return Err(SolaceError);
+        let rc = SolClientReturnCode::from_raw(rc);
+        if !rc.is_ok() {
+            return Err(MessageError::FieldError("priority", rc));
         }
 
         if priority == -1 {
@@ -179,13 +200,15 @@ pub trait Message<'a> {
 
     fn get_sequence_number(&'a self) -> Result<Option<i64>> {
         let mut seq_num: i64 = 0;
-        let op_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_msg_getSequenceNumber(self.get_raw_message_ptr(), &mut seq_num)
         };
-        match SolClientReturnCode::from_i32(op_result) {
-            Some(SolClientReturnCode::Ok) => Ok(Some(seq_num)),
-            Some(SolClientReturnCode::NotFound) => Ok(None),
-            _ => Err(SolaceError),
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        match rc {
+            SolClientReturnCode::Ok => Ok(Some(seq_num)),
+            SolClientReturnCode::NotFound => Ok(None),
+            _ => Err(MessageError::FieldError("sequence_number", rc)),
         }
     }
 
@@ -195,35 +218,36 @@ pub trait Message<'a> {
             dest: ptr::null_mut(),
         };
 
-        let msg_ops_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_msg_getDestination(
                 self.get_raw_message_ptr(),
                 &mut dest_struct,
                 mem::size_of::<ffi::solClient_destination>(),
             )
         };
-        if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::NotFound) {
-            return Ok(None);
-        }
 
-        if SolClientReturnCode::from_i32(msg_ops_result) == Some(SolClientReturnCode::Fail) {
-            return Err(SolaceError);
-        }
+        let rc = SolClientReturnCode::from_raw(rc);
 
-        Ok(Some(MessageDestination::from(dest_struct)))
+        match rc {
+            SolClientReturnCode::NotFound => Ok(None),
+            SolClientReturnCode::Fail => Err(MessageError::FieldError("destination", rc)),
+            _ => Ok(Some(MessageDestination::from(dest_struct))),
+        }
     }
 
     fn get_sender_timestamp(&'a self) -> Result<Option<SystemTime>> {
         let mut ts: i64 = 0;
-        let op_result =
+        let rc =
             unsafe { ffi::solClient_msg_getSenderTimestamp(self.get_raw_message_ptr(), &mut ts) };
 
-        match SolClientReturnCode::from_i32(op_result) {
-            Some(SolClientReturnCode::NotFound) => Ok(None),
-            Some(SolClientReturnCode::Ok) => Ok(Some(
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        match rc {
+            SolClientReturnCode::NotFound => Ok(None),
+            SolClientReturnCode::Ok => Ok(Some(
                 SystemTime::UNIX_EPOCH + Duration::from_millis(ts.try_into().unwrap()),
             )),
-            _ => Err(SolaceError),
+            _ => Err(MessageError::FieldError("sender_timestamp", rc)),
         }
     }
 
@@ -231,7 +255,7 @@ pub trait Message<'a> {
         let mut buffer = ptr::null_mut();
         let mut buffer_len: u32 = 0;
 
-        let msg_ops_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_msg_getUserDataPtr(
                 self.get_raw_message_ptr(),
                 &mut buffer,
@@ -239,10 +263,11 @@ pub trait Message<'a> {
             )
         };
 
-        match SolClientReturnCode::from_i32(msg_ops_result) {
-            Some(SolClientReturnCode::Ok) => (),
-            Some(SolClientReturnCode::NotFound) => return Ok(None),
-            _ => return Err(SolaceError),
+        let rc = SolClientReturnCode::from_raw(rc);
+        match rc {
+            SolClientReturnCode::Ok => (),
+            SolClientReturnCode::NotFound => return Ok(None),
+            _ => return Err(MessageError::FieldError("user_data", rc)),
         }
 
         // the compile time check ASSERT_USIZE_IS_AT_LEAST_U32 guarantees that this conversion is

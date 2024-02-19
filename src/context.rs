@@ -1,7 +1,6 @@
 use crate::Session;
 use crate::SessionError;
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
-use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::marker::PhantomData;
 use std::mem;
@@ -32,13 +31,13 @@ impl RawContext {
     /// Context initializes global variables so it is not safe to have multiple solace contexts.
     /// .
     pub unsafe fn new(log_level: SolaceLogLevel) -> Result<Self> {
-        let solace_initailization_result =
+        let solace_initailization_raw_rc =
             unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
 
-        if SolClientReturnCode::from_i32(solace_initailization_result)
-            != Some(SolClientReturnCode::Ok)
-        {
-            return Err(ContextError::InitializationFailed);
+        let rc = SolClientReturnCode::from_raw(solace_initailization_raw_rc);
+
+        if !rc.is_ok() {
+            return Err(ContextError::InitializationFailed(rc));
         }
         let mut ctx: ffi::solClient_opaqueContext_pt = ptr::null_mut();
         let mut context_func: ffi::solClient_context_createFuncInfo_t =
@@ -57,7 +56,7 @@ impl RawContext {
             ptr::null(),
         ];
 
-        let solace_context_result = unsafe {
+        let solace_context_raw_rc = unsafe {
             ffi::solClient_context_create(
                 conext_props.as_mut_ptr(),
                 &mut ctx,
@@ -66,8 +65,10 @@ impl RawContext {
             )
         };
 
-        if SolClientReturnCode::from_i32(solace_context_result) != Some(SolClientReturnCode::Ok) {
-            return Err(ContextError::InitializationFailed);
+        let rc = SolClientReturnCode::from_raw(solace_context_raw_rc);
+
+        if !rc.is_ok() {
+            return Err(ContextError::InitializationFailed(rc));
         }
         Ok(Self { ctx })
     }
@@ -199,7 +200,7 @@ impl Context {
                 },
             };
 
-        let session_create_result = unsafe {
+        let session_create_raw_rc = unsafe {
             ffi::solClient_session_create(
                 session_props.as_mut_ptr(),
                 self.raw.ctx,
@@ -209,20 +210,23 @@ impl Context {
             )
         };
 
-        if SolClientReturnCode::from_i32(session_create_result) != Some(SolClientReturnCode::Ok) {
-            return Err(SessionError::InitializationFailure);
+        let rc = SolClientReturnCode::from_raw(session_create_raw_rc);
+
+        if !rc.is_ok() {
+            return Err(SessionError::InitializationFailure(rc));
         }
 
-        let connection_result = unsafe { ffi::solClient_session_connect(session_pt) };
+        let connection_raw_rc = unsafe { ffi::solClient_session_connect(session_pt) };
 
-        if SolClientReturnCode::from_i32(connection_result) == Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(connection_raw_rc);
+        if rc.is_ok() {
             Ok(Session {
                 _session_pt: session_pt,
                 context: self.clone(),
                 lifetime: PhantomData,
             })
         } else {
-            Err(SessionError::ConnectionFailure)
+            Err(SessionError::ConnectionFailure(rc))
         }
     }
 }

@@ -1,5 +1,5 @@
-use super::Message;
-use crate::{Result, SolClientReturnCode, SolaceError};
+use super::{Message, MessageError, Result};
+use crate::SolClientReturnCode;
 use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::convert::From;
@@ -16,8 +16,10 @@ unsafe impl Send for InboundMessage {}
 
 impl Drop for InboundMessage {
     fn drop(&mut self) {
-        let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
-        if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
+        let rc = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+        if !rc.is_ok() {
             warn!("warning: message was not dropped properly");
         }
     }
@@ -47,33 +49,36 @@ impl<'a> Message<'a> for InboundMessage {
 impl InboundMessage {
     pub fn get_receive_timestamp(&self) -> Result<Option<SystemTime>> {
         let mut ts: i64 = 0;
-        let op_result =
-            unsafe { ffi::solClient_msg_getRcvTimestamp(self.get_raw_message_ptr(), &mut ts) };
+        let rc = unsafe { ffi::solClient_msg_getRcvTimestamp(self.get_raw_message_ptr(), &mut ts) };
 
-        match SolClientReturnCode::from_i32(op_result) {
-            Some(SolClientReturnCode::NotFound) => Ok(None),
-            Some(SolClientReturnCode::Ok) => Ok(Some(
+        let rc = SolClientReturnCode::from_raw(rc);
+        match rc {
+            SolClientReturnCode::NotFound => Ok(None),
+            SolClientReturnCode::Ok => Ok(Some(
                 SystemTime::UNIX_EPOCH + Duration::from_millis(ts.try_into().unwrap()),
             )),
-            _ => Err(SolaceError),
+            _ => Err(MessageError::FieldError("receive_timestamp", rc)),
         }
     }
 
     pub fn get_sender_id(&self) -> Result<Option<&str>> {
         let mut buffer = ptr::null();
 
-        let msg_ops_result =
+        let rc =
             unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
 
-        match SolClientReturnCode::from_i32(msg_ops_result) {
-            Some(SolClientReturnCode::Ok) => (),
-            Some(SolClientReturnCode::NotFound) => return Ok(None),
-            _ => return Err(SolaceError),
+        let rc = SolClientReturnCode::from_raw(rc);
+        match rc {
+            SolClientReturnCode::Ok => (),
+            SolClientReturnCode::NotFound => return Ok(None),
+            _ => return Err(MessageError::FieldError("sender_id", rc)),
         }
 
         let c_str = unsafe { CStr::from_ptr(buffer) };
 
-        let str = c_str.to_str().map_err(|_| SolaceError)?;
+        let str = c_str
+            .to_str()
+            .map_err(|_| MessageError::FieldConvertionError("sender_id"))?;
 
         Ok(Some(str))
     }
