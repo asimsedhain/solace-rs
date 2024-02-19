@@ -145,20 +145,20 @@ impl Context {
         // it takes in an array of key and values
         // first we specify the key, then the value
         // Session also copies over the props and maintains a copy internally.
-        let session_props = [
-            ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr(),
-            c_host_name.as_ptr() as *const u8,
-            ffi::SOLCLIENT_SESSION_PROP_VPN_NAME.as_ptr(),
-            c_vpn_name.as_ptr() as *const u8,
-            ffi::SOLCLIENT_SESSION_PROP_USERNAME.as_ptr(),
-            c_username.as_ptr() as *const u8,
-            ffi::SOLCLIENT_SESSION_PROP_PASSWORD.as_ptr(),
-            c_password.as_ptr() as *const u8,
-            ffi::SOLCLIENT_SESSION_PROP_CONNECT_BLOCKING.as_ptr(),
-            ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr(),
+        // Note: Needs to live long enough for the values to be copied
+        let mut session_props = [
+            ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr() as *const i8,
+            c_host_name.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_VPN_NAME.as_ptr() as *const i8,
+            c_vpn_name.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_USERNAME.as_ptr() as *const i8,
+            c_username.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_PASSWORD.as_ptr() as *const i8,
+            c_password.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_CONNECT_BLOCKING.as_ptr() as *const i8,
+            ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
             ptr::null(),
-        ]
-        .as_mut_ptr() as *mut *const i8;
+        ];
 
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
@@ -201,7 +201,7 @@ impl Context {
 
         let session_create_result = unsafe {
             ffi::solClient_session_create(
-                session_props,
+                session_props.as_mut_ptr(),
                 self.raw.ctx,
                 &mut session_pt,
                 &mut session_func_info,

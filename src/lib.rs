@@ -62,8 +62,8 @@ pub enum ContextError {
 
 #[derive(Error, Debug)]
 pub enum SessionError {
-    #[error("session receieved invalid argument")]
-    InvalidArgs(#[from] std::ffi::NulError),
+    #[error("session receieved arguments with null value")]
+    InvalidArgsNulError(#[from] std::ffi::NulError),
     #[error("session failed to connect")]
     ConnectionFailure,
     #[error("session failed to initialize")]
