@@ -17,7 +17,6 @@ pub use crate::session::Session;
 #[derive(Debug, Clone)]
 pub struct SolaceError;
 
-
 impl fmt::Display for SolaceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Solace Error Occured!")
