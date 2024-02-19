@@ -13,10 +13,10 @@ use thiserror::Error;
 pub use crate::context::Context;
 pub use crate::session::Session;
 
+// Generic error
 #[derive(Debug, Clone)]
 pub struct SolaceError;
 
-type Result<T> = std::result::Result<T, SolaceError>;
 
 impl fmt::Display for SolaceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

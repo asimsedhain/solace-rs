@@ -4,7 +4,6 @@ use std::{
     ptr,
 };
 
-use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 
 use crate::{Session, SessionError, SolClientReturnCode};
@@ -91,7 +90,7 @@ impl<'session> CacheSession<'session> {
         let c_topic = CString::new(topic)?;
         let flags = ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FLOWTHRU;
 
-        let request_result = unsafe {
+        let rc = unsafe {
             ffi::solClient_cacheSession_sendCacheRequest(
                 self._cache_session_pt,
                 c_topic.as_ptr(),
@@ -103,7 +102,8 @@ impl<'session> CacheSession<'session> {
             )
         };
 
-        if SolClientReturnCode::from_i32(request_result) != Some(SolClientReturnCode::Ok) {
+        let rc = SolClientReturnCode::from_raw(rc);
+        if !rc.is_ok() {
             return Err(SessionError::CacheRequestFailure);
         }
 

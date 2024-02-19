@@ -1,5 +1,4 @@
-use super::Result;
-use crate::SolaceError;
+use super::{MessageError, Result};
 use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::convert::From;
@@ -43,7 +42,8 @@ pub struct MessageDestination {
 
 impl MessageDestination {
     pub fn new<T: Into<Vec<u8>>>(dest_type: DestinationType, destination: T) -> Result<Self> {
-        let c_destination = CString::new(destination).map_err(|_| SolaceError)?;
+        let c_destination = CString::new(destination)
+            .map_err(|_| MessageError::FieldConvertionError("dest_type"))?;
 
         Ok(MessageDestination {
             dest_type,

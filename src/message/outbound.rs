@@ -1,7 +1,6 @@
 use super::destination::MessageDestination;
 use super::{ClassOfService, DeliveryMode, Message};
 use crate::SolClientReturnCode;
-use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::ffi::{c_void, CString, NulError};
 use std::ptr;
@@ -36,7 +35,10 @@ unsafe impl Send for OutboundMessage {}
 impl Drop for OutboundMessage {
     fn drop(&mut self) {
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
-        if SolClientReturnCode::from_i32(msg_free_result) != Some(SolClientReturnCode::Ok) {
+
+        let rc = SolClientReturnCode::from_raw(msg_free_result);
+
+        if !rc.is_ok() {
             warn!("message was not dropped properly");
         }
     }
@@ -156,8 +158,11 @@ impl OutboundMessageBuilder {
     pub fn build(self) -> Result<OutboundMessage> {
         // message allocation
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
-        let msg_alloc_result = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
-        if Some(SolClientReturnCode::Ok) != SolClientReturnCode::from_i32(msg_alloc_result) {
+        let rc = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
             return Err(MessageBuilderError::MessageAlocFailure);
         };
 
