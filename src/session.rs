@@ -3,7 +3,6 @@ use crate::context::Context;
 use crate::message::{Message, OutboundMessage};
 use crate::SessionError;
 use crate::SolClientReturnCode;
-use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::ffi::CString;
 use std::marker::PhantomData;
