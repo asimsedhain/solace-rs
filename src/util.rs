@@ -42,7 +42,7 @@ where
     };
 
     let message = InboundMessage::from(msg_p);
-    let user_closure: &mut Box<F> = unsafe { mem::transmute(raw_user_closure) };
+    let mut user_closure: Box<F> = unsafe { mem::transmute(raw_user_closure) };
     user_closure(message);
 
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_TAKE_MSG
