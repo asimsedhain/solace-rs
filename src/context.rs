@@ -162,10 +162,13 @@ impl Context {
 
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
+        // Box::into_raw(Box::new(Box::new(f))) as *mut _
+        // leaks memory
+        // but without it, causes seg fault
         let (static_on_message_callback, user_on_message) = match on_message {
             Some(f) => (
                 on_message_trampoline(&f),
-                Box::into_raw(Box::new(f)) as *mut _,
+                Box::into_raw(Box::new(Box::new(f))) as *mut _,
             ),
             _ => (None, ptr::null_mut()),
         };
