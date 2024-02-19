@@ -49,24 +49,24 @@ impl<'session> CacheSession<'session> {
         let c_max_age = CString::new(max_age.unwrap_or(0).to_string())?;
         let c_timeout_ms = CString::new(timeout_ms.unwrap_or(10000).to_string())?;
 
-        let cache_session_props = [
-            ffi::SOLCLIENT_CACHESESSION_PROP_CACHE_NAME.as_ptr(),
-            c_cache_name.as_ptr() as *const u8,
-            ffi::SOLCLIENT_CACHESESSION_PROP_DEFAULT_MAX_MSGS.as_ptr(),
-            c_max_message.as_ptr() as *const u8,
-            ffi::SOLCLIENT_CACHESESSION_PROP_MAX_AGE.as_ptr(),
-            c_max_age.as_ptr() as *const u8,
-            ffi::SOLCLIENT_CACHESESSION_PROP_REQUESTREPLY_TIMEOUT_MS.as_ptr(),
-            c_timeout_ms.as_ptr() as *const u8,
+        // Note: Needs to live long enough for the values to be copied
+        let mut cache_session_props = [
+            ffi::SOLCLIENT_CACHESESSION_PROP_CACHE_NAME.as_ptr() as *const i8,
+            c_cache_name.as_ptr(),
+            ffi::SOLCLIENT_CACHESESSION_PROP_DEFAULT_MAX_MSGS.as_ptr() as *const i8,
+            c_max_message.as_ptr(),
+            ffi::SOLCLIENT_CACHESESSION_PROP_MAX_AGE.as_ptr() as *const i8,
+            c_max_age.as_ptr(),
+            ffi::SOLCLIENT_CACHESESSION_PROP_REQUESTREPLY_TIMEOUT_MS.as_ptr() as *const i8,
+            c_timeout_ms.as_ptr(),
             ptr::null(),
-        ]
-        .as_mut_ptr() as *mut *const i8;
+        ];
 
         let mut cache_session_pt: ffi::solClient_opaqueCacheSession_pt = ptr::null_mut();
 
         let cache_create_result = unsafe {
             ffi::solClient_session_createCacheSession(
-                cache_session_props,
+                cache_session_props.as_mut_ptr(),
                 session._session_pt,
                 &mut cache_session_pt,
             )
