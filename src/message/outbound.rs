@@ -18,8 +18,6 @@ pub enum MessageBuilderError {
     SizeErrorArgs(String, usize, usize),
     #[error("timestamp needs to be greater than UNIX_EPOCH")]
     TimestampError,
-    #[error("solClient returned not ok code")]
-    SolClientError,
     #[error("solClient message aloc failed")]
     MessageAlocFailure,
 }
