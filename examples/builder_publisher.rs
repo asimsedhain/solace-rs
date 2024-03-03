@@ -46,7 +46,7 @@ fn main() {
         .expect("Could not subscribe to topic");
     println!("Subscribed to try-me topic");
 
-    for i in 0..50 {
+    for i in 0..10 {
         let message = {
             let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
 
