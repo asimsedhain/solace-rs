@@ -1,5 +1,5 @@
 /**
-Example showing how to create a solace context, session and subscribing to a topic using
+Example showing how to create a solace session using the builder api and subscribing to a topic using
 the session.
 */
 use std::{thread::sleep, time::Duration};
@@ -15,17 +15,25 @@ fn main() {
     };
 
     let session = solace_context
-        .session(
-            "tcp://localhost:55554", // host
-            "default",                        // vpn
-            "default",                        // username
-            "",                               // password
-            Some(on_message),
-            Some(|e: SessionEvent| {
-                println!("on_event handler got: {}", e);
-            }),
-        )
-        .expect("Could not create session");
+        .session_builder()
+        .host_name("tcp://localhost:55554")
+        .vpn_name("default")
+        .username("default")
+        .password("")
+        .client_name("Sol Client")
+        .application_description("This is a library")
+        .keep_alive_interval_ms(600)
+        .keep_alive_limit(5)
+        .generate_sender_id(true)
+        .generate_send_timestamp(true)
+        .generate_rcv_timestamps(true)
+        .generate_sender_sequence_number(true)
+        .on_message(on_message)
+        .on_event(|e: SessionEvent| {
+            println!("on_event handler got: {}", e);
+        })
+        .build()
+        .unwrap();
 
     session
         .subscribe("try-me")
