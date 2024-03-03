@@ -64,8 +64,7 @@ impl InboundMessage {
     pub fn get_sender_id(&self) -> Result<Option<&str>> {
         let mut buffer = ptr::null();
 
-        let rc =
-            unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
+        let rc = unsafe { ffi::solClient_msg_getSenderId(self.get_raw_message_ptr(), &mut buffer) };
 
         let rc = SolClientReturnCode::from_raw(rc);
         match rc {
