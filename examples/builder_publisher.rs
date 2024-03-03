@@ -1,5 +1,5 @@
 /**
-Example showing how to create a solace context, session and publishing to a topic using
+Example showing how to create a solace session using the builder api and publishing to a topic using
 the session.
 */
 use std::{thread::sleep, time::Duration};
@@ -17,23 +17,36 @@ fn main() {
     println!("Context created");
 
     let session = solace_context
-        .session(
-            "tcp://localhost:55554", // host
-            "default",               // vpn
-            "default",               // username
-            "",                      // password
-            Some(|message: InboundMessage| {
-                println!("on_message handler got: {:#?} ", message);
-            }),
-            Some(|e: SessionEvent| {
-                println!("on_event handler got: {}", e);
-            }),
-        )
+        .session_builder()
+        .host_name("tcp://localhost:55554")
+        .vpn_name("default")
+        .username("default")
+        .password("")
+        .client_name("Sol Client")
+        .application_description("This is a library")
+        .keep_alive_interval_ms(600)
+        .keep_alive_limit(5)
+        .generate_sender_id(true)
+        .generate_send_timestamp(true)
+        .generate_rcv_timestamps(true)
+        .generate_sender_sequence_number(true)
+        .on_message(|message: InboundMessage| {
+            println!("on_message handler got: {:#?} ", message);
+        })
+        .on_event(|e: SessionEvent| {
+            println!("on_event handler got: {}", e);
+        })
+        .build()
         .expect("Could not create session");
 
     let topic = "try-me";
 
-    for i in 0..10 {
+    session
+        .subscribe("try-me")
+        .expect("Could not subscribe to topic");
+    println!("Subscribed to try-me topic");
+
+    for i in 0..50 {
         let message = {
             let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
 

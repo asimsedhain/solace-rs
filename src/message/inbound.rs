@@ -4,12 +4,80 @@ use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::convert::From;
 use std::ffi::CStr;
-use std::ptr;
 use std::time::{Duration, SystemTime};
+use std::{fmt, ptr};
 use tracing::warn;
 
 pub struct InboundMessage {
     _msg_ptr: ffi::solClient_opaqueMsg_pt,
+}
+
+impl fmt::Debug for InboundMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut f = f.debug_struct("InboundMessage");
+        if self.get_receive_timestamp().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "receive_timestamp",
+                &format_args!("{:?}", self.get_receive_timestamp().unwrap().unwrap()),
+            );
+        }
+        if self.get_sender_id().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "sender_id",
+                &format_args!("{}", self.get_sender_id().unwrap().unwrap()),
+            );
+        }
+        if self.get_sender_timestamp().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "sender_timestamp",
+                &format_args!("{:?}", self.get_sender_timestamp().unwrap().unwrap()),
+            );
+        }
+        if self.get_sequence_number().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "sequence_number",
+                &format_args!("{}", self.get_sequence_number().unwrap().unwrap()),
+            );
+        }
+        if self.get_correlation_id().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "correlation_id",
+                &format_args!("{}", self.get_correlation_id().unwrap().unwrap()),
+            );
+        }
+        if self.get_priority().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "priority",
+                &format_args!("{}", self.get_priority().unwrap().unwrap()),
+            );
+        }
+        if self.is_discard_indication() {
+            f.field(
+                "is_discard_indication",
+                &format_args!("{}", self.is_discard_indication()),
+            );
+        }
+        if self.get_application_message_id().is_some() {
+            f.field(
+                "application_message_id",
+                &format_args!("{}", &self.get_application_message_id().unwrap()),
+            );
+        }
+        if self.get_user_data().is_ok_and(|v| v.is_some()) {
+            if let Ok(v) = std::str::from_utf8(self.get_user_data().unwrap().unwrap()) {
+                f.field("user_data", &v);
+            }
+        }
+        if self.get_destination().is_ok_and(|v| v.is_some()) {
+            f.field("destination", &self.get_destination().unwrap().unwrap());
+        }
+        if self.get_payload().is_ok_and(|v| v.is_some()) {
+            if let Ok(v) = std::str::from_utf8(self.get_payload().unwrap().unwrap()) {
+                f.field("payload", &v);
+            }
+        }
+        f.finish()
+    }
 }
 
 unsafe impl Send for InboundMessage {}
@@ -64,8 +132,7 @@ impl InboundMessage {
     pub fn get_sender_id(&self) -> Result<Option<&str>> {
         let mut buffer = ptr::null();
 
-        let rc =
-            unsafe { ffi::solClient_msg_getCorrelationId(self.get_raw_message_ptr(), &mut buffer) };
+        let rc = unsafe { ffi::solClient_msg_getSenderId(self.get_raw_message_ptr(), &mut buffer) };
 
         let rc = SolClientReturnCode::from_raw(rc);
         match rc {
