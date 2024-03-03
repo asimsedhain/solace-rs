@@ -511,9 +511,7 @@ impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
             props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.generate_send_timestamp {
-            props.push(
-                ffi::SOLCLIENT_SESSION_PROP_DEFAULT_GENERATE_SEND_TIMESTAMPS.as_ptr() as *const i8,
-            );
+            props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SEND_TIMESTAMPS.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.generate_sender_id {
