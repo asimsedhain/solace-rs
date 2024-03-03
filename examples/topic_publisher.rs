@@ -19,9 +19,9 @@ fn main() {
     let session = solace_context
         .session(
             "tcp://localhost:55554", // host
-            "default",                        // vpn
-            "default",                        // username
-            "",                               // password
+            "default",               // vpn
+            "default",               // username
+            "",                      // password
             Some(|message: InboundMessage| {
                 println!("on_message handler got: {:#?} ", message);
             }),
