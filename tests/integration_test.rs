@@ -6,11 +6,11 @@ use std::{
 };
 
 use solace_rs::{
-    session::SessionEvent,
     message::{
         DeliveryMode, DestinationType, InboundMessage, Message, MessageDestination,
         OutboundMessageBuilder,
     },
+    session::SessionEvent,
     Context, SolaceLogLevel,
 };
 
