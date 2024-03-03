@@ -12,7 +12,7 @@ use crate::message::InboundMessage;
 use std::sync::Arc;
 type Result<T> = std::result::Result<T, ContextError>;
 
-pub struct RawContext {
+pub(super) struct RawContext {
     // This pointer must never be allowed to leave the struct
     pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
@@ -103,7 +103,7 @@ unsafe impl Sync for RawContext {}
 ///
 #[derive(Clone)]
 pub struct Context {
-    pub(crate) raw: Arc<RawContext>,
+    pub(super) raw: Arc<RawContext>,
 }
 
 impl Context {
