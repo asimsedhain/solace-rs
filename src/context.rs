@@ -7,8 +7,8 @@ use std::mem;
 use std::ptr;
 use tracing::warn;
 
-use crate::event::SessionEvent;
 use crate::message::InboundMessage;
+use crate::session::SessionEvent;
 use std::sync::Arc;
 type Result<T> = std::result::Result<T, ContextError>;
 

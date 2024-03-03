@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    event::SessionEvent,
     message::InboundMessage,
+    session::SessionEvent,
     util::{on_event_trampoline, on_message_trampoline},
     Context, Session, SolClientReturnCode,
 };

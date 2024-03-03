@@ -4,7 +4,7 @@ the session.
 */
 use std::{thread::sleep, time::Duration};
 
-use solace_rs::{event::SessionEvent, message::InboundMessage, Context, SolaceLogLevel};
+use solace_rs::{message::InboundMessage, session::SessionEvent, Context, SolaceLogLevel};
 
 fn main() {
     let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();

@@ -5,10 +5,10 @@ the session.
 use std::{thread::sleep, time::Duration};
 
 use solace_rs::{
-    event::SessionEvent,
     message::{
         DeliveryMode, DestinationType, InboundMessage, MessageDestination, OutboundMessageBuilder,
     },
+    session::SessionEvent,
     Context, SolaceLogLevel,
 };
 

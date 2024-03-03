@@ -1,4 +1,8 @@
 pub mod builder;
+pub mod event;
+
+pub use builder::{SessionBuilder, SessionBuilderError};
+pub use event::SessionEvent;
 
 use crate::cache_session::CacheSession;
 use crate::context::Context;

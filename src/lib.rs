@@ -1,6 +1,5 @@
 pub mod cache_session;
 pub mod context;
-pub mod event;
 pub mod message;
 pub mod session;
 pub(crate) mod util;

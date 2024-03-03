@@ -1,7 +1,7 @@
 use num_traits::FromPrimitive;
 
-use crate::event::SessionEvent;
 use crate::message::InboundMessage;
+use crate::session::SessionEvent;
 use solace_rs_sys as ffi;
 use std::mem;
 
