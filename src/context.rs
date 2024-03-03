@@ -116,7 +116,7 @@ impl Context {
         })
     }
 
-    pub fn get_session_builder<Host, Vpn, Username, Password, OnMessage, OnEvent>(
+    pub fn session_builder<Host, Vpn, Username, Password, OnMessage, OnEvent>(
         &self,
     ) -> SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent> {
         SessionBuilder::new(self.clone())

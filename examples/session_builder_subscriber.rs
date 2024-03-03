@@ -34,7 +34,7 @@ fn main() {
         );
     };
 
-    let builder = solace_context.get_session_builder();
+    let builder = solace_context.session_builder();
 
     let session = builder
         .host_name("tcp://localhost:55554")

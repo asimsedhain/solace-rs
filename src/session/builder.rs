@@ -18,23 +18,17 @@ pub enum SessionBuilderError {
     InitializationFailure(SolClientReturnCode),
     #[error("session failed to connect. SolClient return code: {0}")]
     ConnectionFailure(SolClientReturnCode),
-    #[error("builder recieved invalid args")]
+    #[error("arg contains interior nul byte")]
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
     MissingRequiredArgs(String),
-    #[error("{0} size need to be less than {1} found {2}")]
-    SizeErrorArgs(String, usize, usize),
-    #[error("arg: {0} err: {1}")]
-    ValueErrorArgs(String, String),
-    #[error("timestamp needs to be greater than UNIX_EPOCH")]
-    SolClientError,
-    #[error("solClient message aloc failed")]
-    MessageAlocFailure,
+    #[error("{0} valid range is {1} foound {2}")]
+    InvalidRange(String, String, String),
 }
 
 type Result<T> = std::result::Result<T, SessionBuilderError>;
 
-fn bool_to_solace_ptr(b: bool) -> *const i8 {
+fn bool_to_ptr(b: bool) -> *const i8 {
     if b {
         ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8
     } else {
@@ -44,7 +38,7 @@ fn bool_to_solace_ptr(b: bool) -> *const i8 {
 
 struct RawSessionProps<'a> {
     props: Vec<*const i8>,
-    lifetime: PhantomData<&'a ()>,
+    lifetime: PhantomData<&'a CheckedSessionProps>,
 }
 
 struct UncheckedSessionProps<Host, Vpn, Username, Password> {
@@ -145,11 +139,10 @@ impl<Host, Vpn, Username, Password> Default
     }
 }
 
-/// `SessionBuilder` is a configuration struct used for setting up a session with customizable options.
+/// `SessionBuilder` allows setting up a session with customizable options that are not exposed by
+/// the `session` function such as buffer size, timeouts, and more.
 ///
-/// This struct allows for detailed configuration of a session, including aspects like blocking behavior, buffer sizes, timeouts, and more. It is designed to be flexible, catering to various needs and scenarios that might arise during the use of its corresponding library.
-///
-/// For more detailed documentation, refer to [the official library documentation](https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/group___session_props.html).
+/// For more detailed documentation on all the configuration field, refer to [the official library documentation](https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/group___session_props.html).
 pub struct SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent> {
     context: Context,
     props: UncheckedSessionProps<Host, Vpn, Username, Password>,
@@ -467,12 +460,12 @@ impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
             props.push(
                 ffi::SOLCLIENT_SESSION_PROP_IGNORE_DUP_SUBSCRIPTION_ERROR.as_ptr() as *const i8,
             );
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
 
         if let Some(x) = &value.tcp_nodelay {
             props.push(ffi::SOLCLIENT_SESSION_PROP_TCP_NODELAY.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.socket_send_buf_size_bytes {
             props.push(ffi::SOLCLIENT_SESSION_PROP_SOCKET_SEND_BUF_SIZE.as_ptr() as *const i8);
@@ -506,21 +499,21 @@ impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
         }
         if let Some(x) = &value.generate_rcv_timestamps {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_RCV_TIMESTAMPS.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.generate_send_timestamp {
             props.push(
                 ffi::SOLCLIENT_SESSION_PROP_DEFAULT_GENERATE_SEND_TIMESTAMPS.as_ptr() as *const i8,
             );
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.generate_sender_id {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SENDER_ID.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.generate_sender_sequence_number {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SEQUENCE_NUMBER.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.connect_retries_per_host {
             props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_RETRIES_PER_HOST.as_ptr() as *const i8);
@@ -540,7 +533,7 @@ impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
         }
         if let Some(x) = &value.reapply_subscriptions {
             props.push(ffi::SOLCLIENT_SESSION_PROP_REAPPLY_SUBSCRIPTIONS.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.provision_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_PROVISION_TIMEOUT_MS.as_ptr() as *const i8);
@@ -550,11 +543,11 @@ impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
             props.push(
                 ffi::SOLCLIENT_SESSION_PROP_CALCULATE_MESSAGE_EXPIRATION.as_ptr() as *const i8,
             );
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.no_local {
             props.push(ffi::SOLCLIENT_SESSION_PROP_NO_LOCAL.as_ptr() as *const i8);
-            props.push(bool_to_solace_ptr(*x));
+            props.push(bool_to_ptr(*x));
         }
         if let Some(x) = &value.modifyprop_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_MODIFYPROP_TIMEOUT_MS.as_ptr() as *const i8);
@@ -584,7 +577,7 @@ where
         value: UncheckedSessionProps<Host, Vpn, Username, Password>,
     ) -> std::prelude::v1::Result<Self, Self::Error> {
         let host_name = match value.host_name {
-            Some(h) => CString::new(h)?,
+            Some(x) => CString::new(x)?,
             None => {
                 return Err(SessionBuilderError::MissingRequiredArgs(
                     "host_name".to_owned(),
@@ -593,7 +586,7 @@ where
         };
 
         let vpn_name = match value.vpn_name {
-            Some(h) => CString::new(h)?,
+            Some(x) => CString::new(x)?,
             None => {
                 return Err(SessionBuilderError::MissingRequiredArgs(
                     "vpn_name".to_owned(),
@@ -602,7 +595,7 @@ where
         };
 
         let username = match value.username {
-            Some(h) => CString::new(h)?,
+            Some(x) => CString::new(x)?,
             None => {
                 return Err(SessionBuilderError::MissingRequiredArgs(
                     "username".to_owned(),
@@ -611,7 +604,7 @@ where
         };
 
         let password = match value.password {
-            Some(h) => CString::new(h)?,
+            Some(x) => CString::new(x)?,
             None => {
                 return Err(SessionBuilderError::MissingRequiredArgs(
                     "password".to_owned(),
@@ -620,20 +613,21 @@ where
         };
 
         let client_name = match value.client_name {
-            Some(h) => Some(CString::new(h)?),
+            Some(x) => Some(CString::new(x)?),
             None => None,
         };
 
         let application_description = match value.application_description {
-            Some(h) => Some(CString::new(h)?),
+            Some(x) => Some(CString::new(x)?),
             None => None,
         };
 
         let buffer_size_bytes = match value.buffer_size_bytes {
-            Some(b) if b < 1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+            Some(x) if x < 1 => {
+                return Err(SessionBuilderError::InvalidRange(
                     "buffer_size_bytes".to_owned(),
-                    "needs to be greater than or equal to 1".to_owned(),
+                    ">= 1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(b) => Some(CString::new(b.to_string())?),
@@ -642,9 +636,10 @@ where
 
         let block_write_timeout_ms = match value.block_write_timeout_ms {
             Some(x) if x < 1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "block_write_timeout_ms".to_owned(),
-                    "needs to be greater than or equal to 1".to_owned(),
+                    ">= 1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -653,9 +648,10 @@ where
 
         let connect_timeout_ms = match value.connect_timeout_ms {
             Some(x) if x < 1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "connect_timeout_ms".to_owned(),
-                    "needs to be greater than or equal to 1".to_owned(),
+                    ">= 1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -664,9 +660,10 @@ where
 
         let subconfirm_timeout_ms = match value.subconfirm_timeout_ms {
             Some(x) if x < 1000 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "subconfirm_timeout_ms".to_owned(),
-                    "needs to be greater than or equal to 1000".to_owned(),
+                    ">= 1000".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -674,10 +671,11 @@ where
         };
 
         let socket_send_buf_size_bytes = match value.socket_send_buf_size_bytes {
-            Some(x) if x < 1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+            Some(x) if x != 0 && x < 1024 => {
+                return Err(SessionBuilderError::InvalidRange(
                     "socket_send_buf_size_bytes".to_owned(),
-                    "needs to be greater than or equal to 1".to_owned(),
+                    "0 or >= 1024".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -685,10 +683,11 @@ where
         };
 
         let socket_rcv_buf_size_bytes = match value.socket_rcv_buf_size_bytes {
-            Some(x) if x < 1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+            Some(x) if x != 0 && x < 1024 => {
+                return Err(SessionBuilderError::InvalidRange(
                     "socket_rcv_buf_size_bytes".to_owned(),
-                    "needs to be greater than or equal to 1".to_owned(),
+                    "0 or >= 1024".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -697,9 +696,10 @@ where
 
         let keep_alive_interval_ms = match value.keep_alive_interval_ms {
             Some(x) if x != 0 && x < 50 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "keep_alive_interval_ms".to_owned(),
-                    "needs to be 0 or greater than or equal to 50".to_owned(),
+                    "0 or >= 50".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -708,9 +708,10 @@ where
 
         let keep_alive_limit = match value.keep_alive_limit {
             Some(x) if x < 3 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "keep_alive_limit".to_owned(),
-                    "needs to be greater than or equal to 3".to_owned(),
+                    ">= 3".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -719,9 +720,10 @@ where
 
         let compression_level = match value.compression_level {
             Some(x) if x > 9 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "compression_level".to_owned(),
-                    "needs to be less than 10".to_owned(),
+                    "<= 9".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -730,9 +732,10 @@ where
 
         let connect_retries_per_host = match value.connect_retries_per_host {
             Some(x) if x < -1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "connect_retries_per_host".to_owned(),
-                    "needs to be greater than or equal to -1".to_owned(),
+                    ">= -1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -741,9 +744,10 @@ where
 
         let connect_retries = match value.connect_retries {
             Some(x) if x < -1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "connect_retries ".to_owned(),
-                    "needs to be greater than or equal to -1".to_owned(),
+                    ">= -1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -752,9 +756,10 @@ where
 
         let reconnect_retries = match value.reconnect_retries {
             Some(x) if x < -1 => {
-                return Err(SessionBuilderError::ValueErrorArgs(
+                return Err(SessionBuilderError::InvalidRange(
                     "reconnect_retries ".to_owned(),
-                    "needs to be greater than or equal to -1".to_owned(),
+                    ">= -1".to_owned(),
+					x.to_string()
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
