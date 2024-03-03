@@ -352,3 +352,51 @@ fn multi_thread_publisher() {
         rx_msg_map.into_values().collect::<Vec<_>>()
     )
 }
+
+#[test]
+#[ignore]
+fn no_local_session() {
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
+
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
+    let topic = "no_local_session";
+
+    let on_message = move |message: InboundMessage| {
+        let _ = tx.send(message);
+    };
+
+    let session = solace_context
+        .session_builder()
+        .host_name(format!("tcp://{}:{}", host, port))
+        .vpn_name("default")
+        .username("default")
+        .password("")
+        .on_message(on_message)
+        .on_event(|_: SessionEvent| {})
+        .no_local(true)
+        .build()
+        .expect("creating session");
+
+    session.subscribe(topic).expect("subscribing to topic");
+
+    // need to wait before publishing so that the client is properly subscribed
+    sleep(SLEEP_TIME);
+
+    for msg in tx_msgs.clone() {
+        let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
+        let outbound_msg = OutboundMessageBuilder::new()
+            .destination(dest)
+            .delivery_mode(DeliveryMode::Direct)
+            .payload(msg)
+            .build()
+            .expect("building outbound msg");
+        session.publish(outbound_msg).expect("publishing message");
+    }
+    sleep(SLEEP_TIME*2);
+
+
+    assert!(rx.try_recv().is_err());
+}
