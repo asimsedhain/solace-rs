@@ -1,3 +1,4 @@
+use crate::session::builder::SessionBuilder;
 use crate::Session;
 use crate::SessionError;
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
@@ -105,7 +106,7 @@ unsafe impl Sync for RawContext {}
 ///
 #[derive(Clone)]
 pub struct Context {
-    raw: Arc<RawContext>,
+    pub(crate) raw: Arc<RawContext>,
 }
 
 impl Context {
@@ -113,6 +114,12 @@ impl Context {
         Ok(Self {
             raw: Arc::new(unsafe { RawContext::new(log_level) }?),
         })
+    }
+
+    pub fn get_session_builder<Host, Vpn, Username, Password, OnMessage, OnEvent>(
+        &self,
+    ) -> SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent> {
+        SessionBuilder::new(self.clone())
     }
 
     pub fn session<'session, H, V, U, P, M, E>(

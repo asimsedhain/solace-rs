@@ -1,0 +1,811 @@
+use solace_rs_sys as ffi;
+use std::{
+    ffi::{CString, NulError},
+    marker::PhantomData,
+    mem, ptr,
+};
+
+use crate::{
+    event::SessionEvent,
+    message::InboundMessage,
+    util::{on_event_trampoline, on_message_trampoline},
+    Context, Session, SolClientReturnCode,
+};
+
+#[derive(thiserror::Error, Debug)]
+pub enum SessionBuilderError {
+    #[error("session failed to initialize. SolClient return code: {0}")]
+    InitializationFailure(SolClientReturnCode),
+    #[error("session failed to connect. SolClient return code: {0}")]
+    ConnectionFailure(SolClientReturnCode),
+    #[error("builder recieved invalid args")]
+    InvalidArgs(#[from] NulError),
+    #[error("{0} arg need to be set")]
+    MissingRequiredArgs(String),
+    #[error("{0} size need to be less than {1} found {2}")]
+    SizeErrorArgs(String, usize, usize),
+    #[error("arg: {0} err: {1}")]
+    ValueErrorArgs(String, String),
+    #[error("timestamp needs to be greater than UNIX_EPOCH")]
+    SolClientError,
+    #[error("solClient message aloc failed")]
+    MessageAlocFailure,
+}
+
+type Result<T> = std::result::Result<T, SessionBuilderError>;
+
+fn bool_to_solace_ptr(b: bool) -> *const i8 {
+    if b {
+        ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8
+    } else {
+        ffi::SOLCLIENT_PROP_DISABLE_VAL.as_ptr() as *const i8
+    }
+}
+
+struct RawSessionProps<'a> {
+    props: Vec<*const i8>,
+    lifetime: PhantomData<&'a ()>,
+}
+
+struct UncheckedSessionProps<Host, Vpn, Username, Password> {
+    // Note: required params
+    // In the future we can use type state pattern to always force clients to provide these params
+    host_name: Option<Host>,
+    vpn_name: Option<Vpn>,
+    username: Option<Username>,
+    password: Option<Password>,
+
+    // Note: optional params
+    buffer_size_bytes: Option<u64>,
+    block_write_timeout_ms: Option<u64>,
+    connect_timeout_ms: Option<u64>,
+    subconfirm_timeout_ms: Option<u64>,
+    ignore_dup_subscription_error: Option<bool>,
+    tcp_nodelay: Option<bool>,
+    socket_send_buf_size_bytes: Option<u64>,
+    socket_rcv_buf_size_bytes: Option<u64>,
+    keep_alive_interval_ms: Option<u64>,
+    keep_alive_limit: Option<u64>,
+    application_description: Option<Vec<u8>>,
+    client_name: Option<Vec<u8>>,
+    compression_level: Option<u8>,
+    generate_rcv_timestamps: Option<bool>,
+    generate_send_timestamp: Option<bool>,
+    generate_sender_id: Option<bool>,
+    generate_sender_sequence_number: Option<bool>,
+    connect_retries_per_host: Option<i64>,
+    connect_retries: Option<i64>,
+    reconnect_retries: Option<i64>,
+    reconnect_retry_wait_ms: Option<u64>,
+    reapply_subscriptions: Option<bool>,
+    provision_timeout_ms: Option<u64>,
+    calculate_message_expiration: Option<bool>,
+    no_local: Option<bool>,
+    modifyprop_timeout_ms: Option<u64>,
+
+    // TODO: need to check if some of these params will break other assumptions
+    // ex: we might check for ok status on send but if send_blocking is set to false
+    // it will return can_block which will be assumed as an error
+
+    // Note: below params has not exposed
+    // TODO: check if we should even expose this
+    #[allow(dead_code)]
+    send_blocking: Option<bool>,
+    #[allow(dead_code)]
+    subscribe_blocking: Option<bool>,
+    #[allow(dead_code)]
+    block_while_connecting: Option<bool>,
+
+    // TODO: probably should expose this through some other way
+    // maybe a feature flag for the library
+    #[allow(dead_code)]
+    topic_dispatch: Option<bool>,
+}
+
+impl<Host, Vpn, Username, Password> Default
+    for UncheckedSessionProps<Host, Vpn, Username, Password>
+{
+    fn default() -> Self {
+        Self {
+            host_name: None,
+            vpn_name: None,
+            username: None,
+            password: None,
+            buffer_size_bytes: None,
+            block_write_timeout_ms: None,
+            connect_timeout_ms: None,
+            subconfirm_timeout_ms: None,
+            ignore_dup_subscription_error: None,
+            tcp_nodelay: None,
+            socket_send_buf_size_bytes: None,
+            socket_rcv_buf_size_bytes: None,
+            keep_alive_interval_ms: None,
+            keep_alive_limit: None,
+            application_description: None,
+            client_name: None,
+            compression_level: None,
+            generate_rcv_timestamps: None,
+            generate_send_timestamp: None,
+            generate_sender_id: None,
+            generate_sender_sequence_number: None,
+            connect_retries_per_host: None,
+            connect_retries: None,
+            reconnect_retries: None,
+            reconnect_retry_wait_ms: None,
+            reapply_subscriptions: None,
+            provision_timeout_ms: None,
+            calculate_message_expiration: None,
+            no_local: None,
+            modifyprop_timeout_ms: None,
+            send_blocking: None,
+            subscribe_blocking: None,
+            block_while_connecting: None,
+            topic_dispatch: None,
+        }
+    }
+}
+
+/// `SessionBuilder` is a configuration struct used for setting up a session with customizable options.
+///
+/// This struct allows for detailed configuration of a session, including aspects like blocking behavior, buffer sizes, timeouts, and more. It is designed to be flexible, catering to various needs and scenarios that might arise during the use of its corresponding library.
+///
+/// For more detailed documentation, refer to [the official library documentation](https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/group___session_props.html).
+pub struct SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent> {
+    context: Context,
+    props: UncheckedSessionProps<Host, Vpn, Username, Password>,
+
+    // callbacks
+    on_message: Option<OnMessage>,
+    on_event: Option<OnEvent>,
+}
+
+impl<Host, Vpn, Username, Password, OnMessage, OnEvent>
+    SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent>
+{
+    pub(crate) fn new(context: Context) -> Self {
+        Self {
+            context,
+            props: UncheckedSessionProps::default(),
+            on_message: None,
+            on_event: None,
+        }
+    }
+}
+
+impl<'session, Host, Vpn, Username, Password, OnMessage, OnEvent>
+    SessionBuilder<Host, Vpn, Username, Password, OnMessage, OnEvent>
+where
+    Host: Into<Vec<u8>>,
+    Vpn: Into<Vec<u8>>,
+    Username: Into<Vec<u8>>,
+    Password: Into<Vec<u8>>,
+    OnMessage: FnMut(InboundMessage) + Send + 'session,
+    OnEvent: FnMut(SessionEvent) + Send + 'session,
+{
+    pub fn build(mut self) -> Result<Session<'session>> {
+        let config = CheckedSessionProps::try_from(mem::take(&mut self.props))?;
+        let mut raw_props: RawSessionProps = (&config).into();
+
+        let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
+
+        // Box::into_raw(Box::new(Box::new(f))) as *mut _
+        // leaks memory
+        // but without it, causes seg fault
+        let (static_on_message_callback, user_on_message) = match self.on_message {
+            Some(f) => (
+                on_message_trampoline(&f),
+                Box::into_raw(Box::new(Box::new(f))) as *mut _,
+            ),
+            _ => (None, ptr::null_mut()),
+        };
+
+        let (static_on_event_callback, user_on_event) = match self.on_event {
+            Some(f) => (
+                on_event_trampoline(&f),
+                Box::into_raw(Box::new(Box::new(f))) as *mut _,
+            ),
+            _ => (None, ptr::null_mut()),
+        };
+
+        // Function information for Session creation.
+        // The application must set the eventInfo callback information. All Sessions must have an event callback registered.
+        let mut session_func_info: ffi::solClient_session_createFuncInfo_t =
+            ffi::solClient_session_createFuncInfo {
+                rxInfo: ffi::solClient_session_createRxCallbackFuncInfo {
+                    callback_p: ptr::null_mut(),
+                    user_p: ptr::null_mut(),
+                },
+                eventInfo: ffi::solClient_session_createEventCallbackFuncInfo {
+                    callback_p: static_on_event_callback,
+                    user_p: user_on_event,
+                },
+                rxMsgInfo: ffi::solClient_session_createRxMsgCallbackFuncInfo {
+                    callback_p: static_on_message_callback,
+                    user_p: user_on_message,
+                },
+            };
+
+        let session_create_raw_rc = unsafe {
+            ffi::solClient_session_create(
+                raw_props.props.as_mut_ptr(),
+                self.context.raw.ctx,
+                &mut session_pt,
+                &mut session_func_info,
+                std::mem::size_of::<ffi::solClient_session_createFuncInfo_t>(),
+            )
+        };
+
+        let rc = SolClientReturnCode::from_raw(session_create_raw_rc);
+
+        if !rc.is_ok() {
+            return Err(SessionBuilderError::InitializationFailure(rc));
+        }
+
+        let connection_raw_rc = unsafe { ffi::solClient_session_connect(session_pt) };
+
+        let rc = SolClientReturnCode::from_raw(connection_raw_rc);
+        if rc.is_ok() {
+            Ok(Session {
+                _session_pt: session_pt,
+                context: self.context,
+                lifetime: PhantomData,
+            })
+        } else {
+            Err(SessionBuilderError::ConnectionFailure(rc))
+        }
+    }
+
+    pub fn host_name(mut self, host_name: Host) -> Self {
+        self.props.host_name = Some(host_name);
+        self
+    }
+
+    pub fn vpn_name(mut self, vpn_name: Vpn) -> Self {
+        self.props.vpn_name = Some(vpn_name);
+        self
+    }
+    pub fn username(mut self, username: Username) -> Self {
+        self.props.username = Some(username);
+        self
+    }
+    pub fn password(mut self, password: Password) -> Self {
+        self.props.password = Some(password);
+        self
+    }
+
+    pub fn on_message(mut self, on_message: OnMessage) -> Self {
+        self.on_message = Some(on_message);
+        self
+    }
+
+    pub fn on_event(mut self, on_event: OnEvent) -> Self {
+        self.on_event = Some(on_event);
+        self
+    }
+
+    pub fn buffer_size_bytes(mut self, buffer_size_bytes: u64) -> Self {
+        self.props.buffer_size_bytes = Some(buffer_size_bytes);
+        self
+    }
+    pub fn block_write_timeout_ms(mut self, write_timeout_ms: u64) -> Self {
+        self.props.block_write_timeout_ms = Some(write_timeout_ms);
+        self
+    }
+    pub fn connect_timeout_ms(mut self, connect_timeout_ms: u64) -> Self {
+        self.props.connect_timeout_ms = Some(connect_timeout_ms);
+        self
+    }
+    pub fn subconfirm_timeout_ms(mut self, subconfirm_timeout_ms: u64) -> Self {
+        self.props.subconfirm_timeout_ms = Some(subconfirm_timeout_ms);
+        self
+    }
+    pub fn ignore_dup_subscription_error(mut self, ignore_dup_subscription_error: bool) -> Self {
+        self.props.ignore_dup_subscription_error = Some(ignore_dup_subscription_error);
+        self
+    }
+    pub fn tcp_nodelay(mut self, tcp_nodelay: bool) -> Self {
+        self.props.tcp_nodelay = Some(tcp_nodelay);
+        self
+    }
+    pub fn socket_send_buf_size_bytes(mut self, socket_send_buf_size_bytes: u64) -> Self {
+        self.props.socket_send_buf_size_bytes = Some(socket_send_buf_size_bytes);
+        self
+    }
+    pub fn socket_rcv_buf_size_bytes(mut self, socket_rcv_buf_size_bytes: u64) -> Self {
+        self.props.socket_rcv_buf_size_bytes = Some(socket_rcv_buf_size_bytes);
+        self
+    }
+    pub fn keep_alive_interval_ms(mut self, keep_alive_interval_ms: u64) -> Self {
+        self.props.keep_alive_interval_ms = Some(keep_alive_interval_ms);
+        self
+    }
+    pub fn keep_alive_limit(mut self, keep_alive_limit: u64) -> Self {
+        self.props.keep_alive_limit = Some(keep_alive_limit);
+        self
+    }
+    pub fn application_description<AppDescription: Into<Vec<u8>>>(
+        mut self,
+        application_description: AppDescription,
+    ) -> Self {
+        self.props.application_description = Some(application_description.into());
+        self
+    }
+    pub fn client_name<ClientName: Into<Vec<u8>>>(mut self, client_name: ClientName) -> Self {
+        self.props.client_name = Some(client_name.into());
+        self
+    }
+    pub fn compression_level(mut self, compression_level: u8) -> Self {
+        self.props.compression_level = Some(compression_level);
+        self
+    }
+    pub fn generate_rcv_timestamps(mut self, generate_rcv_timestamps: bool) -> Self {
+        self.props.generate_rcv_timestamps = Some(generate_rcv_timestamps);
+        self
+    }
+    pub fn generate_send_timestamp(mut self, generate_send_timestamp: bool) -> Self {
+        self.props.generate_send_timestamp = Some(generate_send_timestamp);
+        self
+    }
+    pub fn generate_sender_id(mut self, generate_sender_id: bool) -> Self {
+        self.props.generate_sender_id = Some(generate_sender_id);
+        self
+    }
+    pub fn generate_sender_sequence_number(
+        mut self,
+        generate_sender_sequence_number: bool,
+    ) -> Self {
+        self.props.generate_sender_sequence_number = Some(generate_sender_sequence_number);
+        self
+    }
+    pub fn connect_retries_per_host(mut self, connect_retries_per_host: i64) -> Self {
+        self.props.connect_retries_per_host = Some(connect_retries_per_host);
+        self
+    }
+    pub fn connect_retries(mut self, connect_retries: i64) -> Self {
+        self.props.connect_retries = Some(connect_retries);
+        self
+    }
+    pub fn reconnect_retries(mut self, reconnect_retries: i64) -> Self {
+        self.props.reconnect_retries = Some(reconnect_retries);
+        self
+    }
+    pub fn reconnect_retry_wait_ms(mut self, reconnect_retry_wait_ms: u64) -> Self {
+        self.props.reconnect_retry_wait_ms = Some(reconnect_retry_wait_ms);
+        self
+    }
+    pub fn reapply_subscriptions(mut self, reapply_subscriptions: bool) -> Self {
+        self.props.reapply_subscriptions = Some(reapply_subscriptions);
+        self
+    }
+    pub fn provision_timeout_ms(mut self, provision_timeout_ms: u64) -> Self {
+        self.props.provision_timeout_ms = Some(provision_timeout_ms);
+        self
+    }
+    pub fn calculate_message_expiration(mut self, calculate_message_expiration: bool) -> Self {
+        self.props.calculate_message_expiration = Some(calculate_message_expiration);
+        self
+    }
+    pub fn no_local(mut self, no_local: bool) -> Self {
+        self.props.no_local = Some(no_local);
+        self
+    }
+    pub fn modifyprop_timeout_ms(mut self, modifyprop_timeout_ms: u64) -> Self {
+        self.props.modifyprop_timeout_ms = Some(modifyprop_timeout_ms);
+        self
+    }
+}
+
+struct CheckedSessionProps {
+    host_name: CString,
+    vpn_name: CString,
+    username: CString,
+    password: CString,
+
+    // Note: optional params
+    buffer_size_bytes: Option<CString>,
+    block_write_timeout_ms: Option<CString>,
+    connect_timeout_ms: Option<CString>,
+    subconfirm_timeout_ms: Option<CString>,
+    ignore_dup_subscription_error: Option<bool>,
+    tcp_nodelay: Option<bool>,
+    socket_send_buf_size_bytes: Option<CString>,
+    socket_rcv_buf_size_bytes: Option<CString>,
+    keep_alive_interval_ms: Option<CString>,
+    keep_alive_limit: Option<CString>,
+    application_description: Option<CString>,
+    client_name: Option<CString>,
+    compression_level: Option<CString>,
+    generate_rcv_timestamps: Option<bool>,
+    generate_send_timestamp: Option<bool>,
+    generate_sender_id: Option<bool>,
+    generate_sender_sequence_number: Option<bool>,
+    connect_retries_per_host: Option<CString>,
+    connect_retries: Option<CString>,
+    reconnect_retries: Option<CString>,
+    reconnect_retry_wait_ms: Option<CString>,
+    reapply_subscriptions: Option<bool>,
+    provision_timeout_ms: Option<CString>,
+    calculate_message_expiration: Option<bool>,
+    no_local: Option<bool>,
+    modifyprop_timeout_ms: Option<CString>,
+}
+
+impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
+    fn from(value: &'a CheckedSessionProps) -> Self {
+        let mut props = vec![
+            ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr() as *const i8,
+            value.host_name.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_VPN_NAME.as_ptr() as *const i8,
+            value.vpn_name.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_USERNAME.as_ptr() as *const i8,
+            value.username.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_PASSWORD.as_ptr() as *const i8,
+            value.password.as_ptr(),
+            ffi::SOLCLIENT_SESSION_PROP_CONNECT_BLOCKING.as_ptr() as *const i8,
+            ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
+        ];
+
+        if let Some(x) = &value.buffer_size_bytes {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_BUFFER_SIZE.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+
+        if let Some(x) = &value.block_write_timeout_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_BLOCKING_WRITE_TIMEOUT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.connect_timeout_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_TIMEOUT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+
+        if let Some(x) = &value.subconfirm_timeout_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_SUBCONFIRM_TIMEOUT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.ignore_dup_subscription_error {
+            props.push(
+                ffi::SOLCLIENT_SESSION_PROP_IGNORE_DUP_SUBSCRIPTION_ERROR.as_ptr() as *const i8,
+            );
+            props.push(bool_to_solace_ptr(*x));
+        }
+
+        if let Some(x) = &value.tcp_nodelay {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_TCP_NODELAY.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.socket_send_buf_size_bytes {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_SOCKET_SEND_BUF_SIZE.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+
+        if let Some(x) = &value.socket_rcv_buf_size_bytes {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_SOCKET_RCV_BUF_SIZE.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.keep_alive_interval_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_KEEP_ALIVE_INT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.keep_alive_limit {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_KEEP_ALIVE_LIMIT.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.application_description {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_APPLICATION_DESCRIPTION.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.client_name {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_CLIENT_NAME.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+
+        if let Some(x) = &value.compression_level {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_COMPRESSION_LEVEL.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.generate_rcv_timestamps {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_RCV_TIMESTAMPS.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.generate_send_timestamp {
+            props.push(
+                ffi::SOLCLIENT_SESSION_PROP_DEFAULT_GENERATE_SEND_TIMESTAMPS.as_ptr() as *const i8,
+            );
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.generate_sender_id {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SENDER_ID.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.generate_sender_sequence_number {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SEQUENCE_NUMBER.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.connect_retries_per_host {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_RETRIES_PER_HOST.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.connect_retries {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_RETRIES.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.reconnect_retries {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_RECONNECT_RETRIES.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.reconnect_retry_wait_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_RECONNECT_RETRY_WAIT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.reapply_subscriptions {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_REAPPLY_SUBSCRIPTIONS.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.provision_timeout_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_PROVISION_TIMEOUT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+        if let Some(x) = &value.calculate_message_expiration {
+            props.push(
+                ffi::SOLCLIENT_SESSION_PROP_CALCULATE_MESSAGE_EXPIRATION.as_ptr() as *const i8,
+            );
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.no_local {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_NO_LOCAL.as_ptr() as *const i8);
+            props.push(bool_to_solace_ptr(*x));
+        }
+        if let Some(x) = &value.modifyprop_timeout_ms {
+            props.push(ffi::SOLCLIENT_SESSION_PROP_MODIFYPROP_TIMEOUT_MS.as_ptr() as *const i8);
+            props.push(x.as_ptr());
+        }
+
+        props.push(ptr::null());
+
+        Self {
+            props,
+            lifetime: PhantomData,
+        }
+    }
+}
+
+impl<Host, Vpn, Username, Password> TryFrom<UncheckedSessionProps<Host, Vpn, Username, Password>>
+    for CheckedSessionProps
+where
+    Host: Into<Vec<u8>>,
+    Vpn: Into<Vec<u8>>,
+    Username: Into<Vec<u8>>,
+    Password: Into<Vec<u8>>,
+{
+    type Error = SessionBuilderError;
+
+    fn try_from(
+        value: UncheckedSessionProps<Host, Vpn, Username, Password>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
+        let host_name = match value.host_name {
+            Some(h) => CString::new(h)?,
+            None => {
+                return Err(SessionBuilderError::MissingRequiredArgs(
+                    "host_name".to_owned(),
+                ));
+            }
+        };
+
+        let vpn_name = match value.vpn_name {
+            Some(h) => CString::new(h)?,
+            None => {
+                return Err(SessionBuilderError::MissingRequiredArgs(
+                    "vpn_name".to_owned(),
+                ));
+            }
+        };
+
+        let username = match value.username {
+            Some(h) => CString::new(h)?,
+            None => {
+                return Err(SessionBuilderError::MissingRequiredArgs(
+                    "username".to_owned(),
+                ));
+            }
+        };
+
+        let password = match value.password {
+            Some(h) => CString::new(h)?,
+            None => {
+                return Err(SessionBuilderError::MissingRequiredArgs(
+                    "password".to_owned(),
+                ));
+            }
+        };
+
+        let client_name = match value.client_name {
+            Some(h) => Some(CString::new(h)?),
+            None => None,
+        };
+
+        let application_description = match value.application_description {
+            Some(h) => Some(CString::new(h)?),
+            None => None,
+        };
+
+        let buffer_size_bytes = match value.buffer_size_bytes {
+            Some(b) if b < 1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "buffer_size_bytes".to_owned(),
+                    "needs to be greater than or equal to 1".to_owned(),
+                ));
+            }
+            Some(b) => Some(CString::new(b.to_string())?),
+            None => None,
+        };
+
+        let block_write_timeout_ms = match value.block_write_timeout_ms {
+            Some(x) if x < 1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "block_write_timeout_ms".to_owned(),
+                    "needs to be greater than or equal to 1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let connect_timeout_ms = match value.connect_timeout_ms {
+            Some(x) if x < 1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "connect_timeout_ms".to_owned(),
+                    "needs to be greater than or equal to 1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let subconfirm_timeout_ms = match value.subconfirm_timeout_ms {
+            Some(x) if x < 1000 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "subconfirm_timeout_ms".to_owned(),
+                    "needs to be greater than or equal to 1000".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let socket_send_buf_size_bytes = match value.socket_send_buf_size_bytes {
+            Some(x) if x < 1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "socket_send_buf_size_bytes".to_owned(),
+                    "needs to be greater than or equal to 1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let socket_rcv_buf_size_bytes = match value.socket_rcv_buf_size_bytes {
+            Some(x) if x < 1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "socket_rcv_buf_size_bytes".to_owned(),
+                    "needs to be greater than or equal to 1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let keep_alive_interval_ms = match value.keep_alive_interval_ms {
+            Some(x) if x != 0 && x < 50 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "keep_alive_interval_ms".to_owned(),
+                    "needs to be 0 or greater than or equal to 50".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let keep_alive_limit = match value.keep_alive_limit {
+            Some(x) if x < 3 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "keep_alive_limit".to_owned(),
+                    "needs to be greater than or equal to 3".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let compression_level = match value.compression_level {
+            Some(x) if x > 9 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "compression_level".to_owned(),
+                    "needs to be less than 10".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let connect_retries_per_host = match value.connect_retries_per_host {
+            Some(x) if x < -1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "connect_retries_per_host".to_owned(),
+                    "needs to be greater than or equal to -1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let connect_retries = match value.connect_retries {
+            Some(x) if x < -1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "connect_retries ".to_owned(),
+                    "needs to be greater than or equal to -1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let reconnect_retries = match value.reconnect_retries {
+            Some(x) if x < -1 => {
+                return Err(SessionBuilderError::ValueErrorArgs(
+                    "reconnect_retries ".to_owned(),
+                    "needs to be greater than or equal to -1".to_owned(),
+                ));
+            }
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let reconnect_retry_wait_ms = match value.reconnect_retry_wait_ms {
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        let provision_timeout_ms = match value.provision_timeout_ms {
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+        let modifyprop_timeout_ms = match value.modifyprop_timeout_ms {
+            Some(x) => Some(CString::new(x.to_string())?),
+            None => None,
+        };
+
+        Ok(Self {
+            host_name,
+            vpn_name,
+            username,
+            password,
+            buffer_size_bytes,
+            block_write_timeout_ms,
+            connect_timeout_ms,
+            subconfirm_timeout_ms,
+            ignore_dup_subscription_error: value.ignore_dup_subscription_error,
+            tcp_nodelay: value.tcp_nodelay,
+            socket_send_buf_size_bytes,
+            socket_rcv_buf_size_bytes,
+            keep_alive_interval_ms,
+            keep_alive_limit,
+            application_description,
+            client_name,
+            compression_level,
+            generate_rcv_timestamps: value.generate_rcv_timestamps,
+            generate_send_timestamp: value.generate_send_timestamp,
+            generate_sender_id: value.generate_sender_id,
+            generate_sender_sequence_number: value.generate_sender_sequence_number,
+            connect_retries_per_host,
+            connect_retries,
+            reconnect_retries,
+            reconnect_retry_wait_ms,
+            reapply_subscriptions: value.reapply_subscriptions,
+            provision_timeout_ms,
+            calculate_message_expiration: value.calculate_message_expiration,
+            no_local: value.no_local,
+            modifyprop_timeout_ms,
+        })
+    }
+}
