@@ -177,13 +177,22 @@ where
 {
     pub fn build(mut self) -> Result<Session<'session>> {
         let config = CheckedSessionProps::try_from(mem::take(&mut self.props))?;
+
+        // Session props is a **char in C
+        // it takes in an array of key and values
+        // first we specify the key, then the value
+        // Session also copies over the props and maintains a copy internally.
+        // Note: Needs to live long enough for the values to be copied
         let mut raw_props: RawSessionProps = (&config).into();
 
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
         // Box::into_raw(Box::new(Box::new(f))) as *mut _
-        // leaks memory
-        // but without it, causes seg fault
+        // need to box it twice
+        // first box will result in a fat pointer
+        // causing a seg fault when dereffing in C land.
+        // leaking is also fine since the lifetime of the closure is set to be the lifetime of the
+        // session
         let (static_on_message_callback, user_on_message) = match self.on_message {
             Some(f) => (
                 on_message_trampoline(&f),
@@ -627,7 +636,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "buffer_size_bytes".to_owned(),
                     ">= 1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(b) => Some(CString::new(b.to_string())?),
@@ -639,7 +648,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "block_write_timeout_ms".to_owned(),
                     ">= 1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -651,7 +660,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "connect_timeout_ms".to_owned(),
                     ">= 1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -663,7 +672,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "subconfirm_timeout_ms".to_owned(),
                     ">= 1000".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -675,7 +684,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "socket_send_buf_size_bytes".to_owned(),
                     "0 or >= 1024".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -687,7 +696,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "socket_rcv_buf_size_bytes".to_owned(),
                     "0 or >= 1024".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -699,7 +708,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "keep_alive_interval_ms".to_owned(),
                     "0 or >= 50".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -711,7 +720,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "keep_alive_limit".to_owned(),
                     ">= 3".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -723,7 +732,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "compression_level".to_owned(),
                     "<= 9".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -735,7 +744,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "connect_retries_per_host".to_owned(),
                     ">= -1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -747,7 +756,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "connect_retries ".to_owned(),
                     ">= -1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
@@ -759,7 +768,7 @@ where
                 return Err(SessionBuilderError::InvalidRange(
                     "reconnect_retries ".to_owned(),
                     ">= -1".to_owned(),
-					x.to_string()
+                    x.to_string(),
                 ));
             }
             Some(x) => Some(CString::new(x.to_string())?),
