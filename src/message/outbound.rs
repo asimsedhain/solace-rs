@@ -61,6 +61,7 @@ pub struct OutboundMessageBuilder {
     application_msg_type: Option<Vec<u8>>,
     user_data: Option<Vec<u8>>,
     sender_ts: Option<SystemTime>,
+    eliding_eligible: Option<()>,
 }
 
 impl OutboundMessageBuilder {
@@ -150,6 +151,16 @@ impl OutboundMessageBuilder {
         M: Into<Vec<u8>>,
     {
         self.correlation_id = Some(id.into());
+        self
+    }
+
+    pub fn eliding_eligible(mut self, eliding_eligible: bool) -> Self {
+        if eliding_eligible{
+            self.eliding_eligible = Some(());
+        }        
+        else{
+            self.eliding_eligible = None;
+        }
         self
     }
 
@@ -285,6 +296,10 @@ impl OutboundMessageBuilder {
                     CString::new(message_type)?.as_ptr(),
                 )
             };
+        }
+
+        if self.eliding_eligible.is_some(){           
+            unsafe { ffi::solClient_msg_setElidingEligible(msg_ptr, true.into()) };                        
         }
 
         Ok(OutboundMessage { _msg_ptr: msg_ptr })
