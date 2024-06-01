@@ -174,6 +174,13 @@ pub trait Message<'a> {
         Ok(Some(str))
     }
 
+    fn is_eliding_eligible(&'a self) -> bool {
+        let unsafe_result =
+            unsafe { ffi::solClient_msg_isElidingEligible(self.get_raw_message_ptr()) };
+
+        unsafe_result != 0
+    }
+
     fn get_expiration(&'a self) -> i64 {
         let mut exp: i64 = 0;
         unsafe { ffi::solClient_msg_getExpiration(self.get_raw_message_ptr(), &mut exp) };
