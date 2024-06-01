@@ -155,10 +155,9 @@ impl OutboundMessageBuilder {
     }
 
     pub fn eliding_eligible(mut self, eliding_eligible: bool) -> Self {
-        if eliding_eligible{
+        if eliding_eligible {
             self.eliding_eligible = Some(());
-        }        
-        else{
+        } else {
             self.eliding_eligible = None;
         }
         self
@@ -298,8 +297,8 @@ impl OutboundMessageBuilder {
             };
         }
 
-        if self.eliding_eligible.is_some(){           
-            unsafe { ffi::solClient_msg_setElidingEligible(msg_ptr, true.into()) };                        
+        if self.eliding_eligible.is_some() {
+            unsafe { ffi::solClient_msg_setElidingEligible(msg_ptr, true.into()) };
         }
 
         Ok(OutboundMessage { _msg_ptr: msg_ptr })
@@ -320,6 +319,31 @@ mod tests {
             .payload("Hello")
             .build()
             .unwrap();
+    }
+
+    #[test]
+    fn it_should_build_with_eliding_eligible() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let non_elided_msg = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .eliding_eligible(false)
+            .build()
+            .unwrap();
+
+        assert!(!non_elided_msg.is_eliding_eligible());
+
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let elided_msg = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .eliding_eligible(true)
+            .build()
+            .unwrap();
+
+        assert!(elided_msg.is_eliding_eligible());
     }
 
     #[test]
