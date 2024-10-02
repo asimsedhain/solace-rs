@@ -17,8 +17,12 @@ const SOLCLIENT_GZ_PATH: &str = "solclient_Linux-aarch64_opt_7.26.1.8.tar.gz";
 const SOLCLIENT_GZ_PATH: &str = "solclient_Linux_musl-x86_64_opt_7.26.1.8.tar.gz";
 
 fn download_and_unpack(url: &str, tarball_path: PathBuf, tarball_unpack_path: PathBuf) {
-    let resp = reqwest::blocking::get(url).unwrap();
-    let content = resp.bytes().unwrap();
+    let mut content = Vec::new();
+    let _ = ureq::get(url)
+        .call()
+        .unwrap()
+        .into_reader()
+        .read_to_end(&mut content);
 
     let mut file_gz = std::fs::File::create(tarball_path.clone()).unwrap();
     file_gz.write_all(&content).unwrap();
