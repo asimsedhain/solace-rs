@@ -96,12 +96,23 @@ impl<'session> CacheSession<'session> {
         })
     }
 
-    pub fn blocking_cache_request<T>(&self, topic: T, request_id: u64) -> Result<(), SessionError>
+    pub fn blocking_cache_request<T>(
+        &self,
+        topic: T,
+        request_id: u64,
+        subscribe: bool,
+    ) -> Result<(), SessionError>
     where
         T: Into<Vec<u8>>,
     {
         let c_topic = CString::new(topic)?;
-        let flags = ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FLOWTHRU;
+
+        let flags = if subscribe {
+            ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FLOWTHRU
+                & ffi::SOLCLIENT_CACHEREQUEST_FLAGS_NO_SUBSCRIBE
+        } else {
+            ffi::SOLCLIENT_CACHEREQUEST_FLAGS_LIVEDATA_FLOWTHRU
+        };
 
         let rc = unsafe {
             ffi::solClient_cacheSession_sendCacheRequest(

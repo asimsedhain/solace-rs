@@ -160,4 +160,18 @@ impl InboundMessage {
 
         true
     }
+
+    pub fn get_cache_request_id(&self) -> Result<Option<u64>> {
+        let mut id: u64 = 0;
+
+        let rc =
+            unsafe { ffi::solClient_msg_getCacheRequestId(self.get_raw_message_ptr(), &mut id) };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+        match rc {
+            SolClientReturnCode::Ok => Ok(Some(id)),
+            SolClientReturnCode::NotFound => Ok(None),
+            _ => Err(MessageError::FieldError("cache_request_id", rc)),
+        }
+    }
 }
