@@ -5,6 +5,7 @@ use std::{
 };
 
 use solace_rs_sys as ffi;
+use tracing::warn;
 
 use crate::{Session, SessionError, SolClientReturnCode};
 
@@ -23,6 +24,18 @@ impl<'session> Deref for CacheSession<'session> {
 
     fn deref(&self) -> &Self::Target {
         &self.session
+    }
+}
+
+impl Drop for CacheSession<'_> {
+    fn drop(&mut self) {
+        let session_free_result =
+            unsafe { ffi::solClient_cacheSession_destroy(&mut self._cache_session_pt) };
+        let rc = SolClientReturnCode::from_raw(session_free_result);
+
+        if !rc.is_ok() {
+            warn!("cache session was not dropped properly. {rc}");
+        }
     }
 }
 
