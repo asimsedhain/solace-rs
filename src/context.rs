@@ -5,6 +5,7 @@ use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use solace_rs_sys as ffi;
 use std::mem;
 use std::ptr;
+use std::sync::Once;
 use tracing::warn;
 
 use crate::message::InboundMessage;
@@ -16,6 +17,9 @@ pub(super) struct RawContext {
     // This pointer must never be allowed to leave the struct
     pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
+
+static SOLACE_GLOBAL_INIT: Once = Once::new();
+static mut SOLACE_GLOBAL_INIT_RC: i32 = 0;
 
 impl RawContext {
     /// .
@@ -29,10 +33,12 @@ impl RawContext {
     /// Context initializes global variables so it is not safe to have multiple solace contexts.
     /// .
     pub unsafe fn new(log_level: SolaceLogLevel) -> Result<Self> {
-        let solace_initailization_raw_rc =
-            unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
+        SOLACE_GLOBAL_INIT.call_once(|| {
+            SOLACE_GLOBAL_INIT_RC =
+                unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
+        });
 
-        let rc = SolClientReturnCode::from_raw(solace_initailization_raw_rc);
+        let rc = SolClientReturnCode::from_raw(SOLACE_GLOBAL_INIT_RC);
 
         if !rc.is_ok() {
             return Err(ContextError::InitializationFailed(rc));
@@ -74,10 +80,7 @@ impl RawContext {
 
 impl Drop for RawContext {
     fn drop(&mut self) {
-        // TODO
-        // shifts cleanup to be context specific
-        // only clean up globally when all the contexts have died
-        let return_code = unsafe { ffi::solClient_cleanup() };
+        let return_code = unsafe { ffi::solClient_context_destroy(&mut self.ctx) };
         if return_code != ffi::solClient_returnCode_SOLCLIENT_OK {
             warn!("Solace context did not drop properly");
         }
