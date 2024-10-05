@@ -7,7 +7,7 @@ use std::{
 use solace_rs_sys as ffi;
 use tracing::warn;
 
-use crate::{Session, SessionError, SolClientReturnCode};
+use crate::{util::get_last_error_info, Session, SessionError, SolClientReturnCode};
 
 pub struct CacheSession<'session> {
     // Pointer to session
@@ -87,7 +87,8 @@ impl<'session> CacheSession<'session> {
         let rc = SolClientReturnCode::from_raw(cache_create_raw_result);
 
         if !rc.is_ok() {
-            return Err(SessionError::InitializationFailure(rc));
+            let subcode = get_last_error_info();
+            return Err(SessionError::InitializationFailure(rc, subcode));
         }
 
         Ok(CacheSession {
@@ -128,7 +129,8 @@ impl<'session> CacheSession<'session> {
 
         let rc = SolClientReturnCode::from_raw(rc);
         if !rc.is_ok() {
-            return Err(SessionError::CacheRequestFailure);
+            let subcode = get_last_error_info();
+            return Err(SessionError::CacheRequestFailure(rc, subcode));
         }
 
         Ok(())

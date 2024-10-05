@@ -6,7 +6,7 @@ pub(crate) mod util;
 
 use enum_primitive::*;
 use solace_rs_sys as ffi;
-use std::fmt::{self};
+use std::fmt::{self, Display};
 use thiserror::Error;
 
 pub use crate::context::Context;
@@ -94,26 +94,38 @@ impl SolClientReturnCode {
     }
 }
 
+#[derive(Debug)]
+pub struct SolClientSubCode {
+    pub subcode: u32,
+    pub error_string: String,
+}
+
+impl Display for SolClientSubCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "subcode: {} string: {}", self.subcode, self.error_string)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ContextError {
     #[error("context thread failed to initialize. SolClient return code: {0:?}")]
-    InitializationFailed(SolClientReturnCode),
+    InitializationFailed(SolClientReturnCode, SolClientSubCode),
 }
 
 #[derive(Error, Debug)]
 pub enum SessionError {
     #[error("session receieved arguments with null value")]
     InvalidArgsNulError(#[from] std::ffi::NulError),
-    #[error("session failed to connect. SolClient return code: {0}")]
-    ConnectionFailure(SolClientReturnCode),
-    #[error("session failed to initialize. SolClient return code: {0}")]
-    InitializationFailure(SolClientReturnCode),
-    #[error("session failed to subscribe on topic. SolClient return code: {0}")]
-    SubscriptionFailure(String, SolClientReturnCode),
-    #[error("session failed to unsubscribe on topic. SolClient return code: {0}")]
-    UnsubscriptionFailure(String, SolClientReturnCode),
+    #[error("session failed to connect. SolClient return code: {0} subcode: {1}")]
+    ConnectionFailure(SolClientReturnCode, SolClientSubCode),
+    #[error("session failed to initialize. SolClient return code: {0} subcode: {1}")]
+    InitializationFailure(SolClientReturnCode, SolClientSubCode),
+    #[error("session failed to subscribe on topic. SolClient return code: {0} subcode: {1}")]
+    SubscriptionFailure(String, SolClientReturnCode, SolClientSubCode),
+    #[error("session failed to unsubscribe on topic. SolClient return code: {0} subcode: {1}")]
+    UnsubscriptionFailure(String, SolClientReturnCode, SolClientSubCode),
     #[error("cache request failed")]
-    CacheRequestFailure,
+    CacheRequestFailure(SolClientReturnCode, SolClientSubCode),
     #[error("could not publish message. SolClient return code: {0}")]
-    PublishError(SolClientReturnCode),
+    PublishError(SolClientReturnCode, SolClientSubCode),
 }

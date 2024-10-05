@@ -1,7 +1,9 @@
+use ffi::solClient_getLastErrorInfo;
 use num_traits::FromPrimitive;
 
 use crate::message::InboundMessage;
 use crate::session::SessionEvent;
+use crate::SolClientSubCode;
 use solace_rs_sys as ffi;
 use std::mem;
 
@@ -71,4 +73,18 @@ extern "C" fn static_on_event<'s, F>(
     let user_closure: &mut Box<F> = unsafe { mem::transmute(raw_user_closure) };
 
     user_closure(event);
+}
+
+pub(crate) fn get_last_error_info() -> SolClientSubCode {
+    // Safety: erno is never null
+    unsafe {
+        let erno = solClient_getLastErrorInfo();
+        let subcode = (*erno).subCode;
+        let repr_raw: [u8; 256] = mem::transmute((*erno).errorStr);
+        let repr = std::ffi::CStr::from_bytes_until_nul(&repr_raw).unwrap();
+        SolClientSubCode {
+            subcode,
+            error_string: repr.to_string_lossy().to_string(),
+        }
+    }
 }

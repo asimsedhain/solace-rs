@@ -8,16 +8,16 @@ use std::{
 use crate::{
     message::InboundMessage,
     session::SessionEvent,
-    util::{on_event_trampoline, on_message_trampoline},
-    Context, Session, SolClientReturnCode,
+    util::{get_last_error_info, on_event_trampoline, on_message_trampoline},
+    Context, Session, SolClientReturnCode, SolClientSubCode,
 };
 
 #[derive(thiserror::Error, Debug)]
 pub enum SessionBuilderError {
-    #[error("session failed to initialize. SolClient return code: {0}")]
-    InitializationFailure(SolClientReturnCode),
-    #[error("session failed to connect. SolClient return code: {0}")]
-    ConnectionFailure(SolClientReturnCode),
+    #[error("session failed to initialize. SolClient return code: {0} subcode: {1}")]
+    InitializationFailure(SolClientReturnCode, SolClientSubCode),
+    #[error("session failed to connect. SolClient return code: {0} subcode: {1}")]
+    ConnectionFailure(SolClientReturnCode, SolClientSubCode),
     #[error("arg contains interior nul byte")]
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
@@ -240,7 +240,8 @@ where
         let rc = SolClientReturnCode::from_raw(session_create_raw_rc);
 
         if !rc.is_ok() {
-            return Err(SessionBuilderError::InitializationFailure(rc));
+            let subcode = get_last_error_info();
+            return Err(SessionBuilderError::InitializationFailure(rc, subcode));
         }
 
         let connection_raw_rc = unsafe { ffi::solClient_session_connect(session_pt) };
@@ -253,7 +254,8 @@ where
                 lifetime: PhantomData,
             })
         } else {
-            Err(SessionBuilderError::ConnectionFailure(rc))
+            let subcode = get_last_error_info();
+            Err(SessionBuilderError::ConnectionFailure(rc, subcode))
         }
     }
 
