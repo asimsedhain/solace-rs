@@ -61,8 +61,7 @@ jobs:
         with:
           toolchain: ${{ env.rust_version }}
       - run: cargo build --all-targets --verbose
-      - run: cargo test --release
-      - run: cargo test --release -- --ignored
+      - run: cargo test --release -- --include-ignored
         env:
           SOLACE_HOST: 0.0.0.0
           SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
