@@ -1,5 +1,6 @@
 use crate::session::builder::SessionBuilder;
 use crate::session::builder::SessionBuilderError;
+use crate::util::get_last_error_info;
 use crate::Session;
 use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use solace_rs_sys as ffi;
@@ -41,7 +42,8 @@ impl RawContext {
         let rc = SolClientReturnCode::from_raw(SOLACE_GLOBAL_INIT_RC);
 
         if !rc.is_ok() {
-            return Err(ContextError::InitializationFailed(rc));
+            let subcode = get_last_error_info();
+            return Err(ContextError::InitializationFailed(rc, subcode));
         }
         let mut ctx: ffi::solClient_opaqueContext_pt = ptr::null_mut();
         let mut context_func: ffi::solClient_context_createFuncInfo_t =
@@ -72,7 +74,8 @@ impl RawContext {
         let rc = SolClientReturnCode::from_raw(solace_context_raw_rc);
 
         if !rc.is_ok() {
-            return Err(ContextError::InitializationFailed(rc));
+            let subcode = get_last_error_info();
+            return Err(ContextError::InitializationFailed(rc, subcode));
         }
         Ok(Self { ctx })
     }

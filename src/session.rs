@@ -7,6 +7,7 @@ pub use event::SessionEvent;
 use crate::cache_session::CacheSession;
 use crate::context::Context;
 use crate::message::{Message, OutboundMessage};
+use crate::util::get_last_error_info;
 use crate::SessionError;
 use crate::SolClientReturnCode;
 use solace_rs_sys as ffi;
@@ -39,7 +40,8 @@ impl<'session> Session<'session> {
 
         let rc = SolClientReturnCode::from_raw(send_message_raw_rc);
         if !rc.is_ok() {
-            return Err(SessionError::PublishError(rc));
+            let subcode = get_last_error_info();
+            return Err(SessionError::PublishError(rc, subcode));
         }
 
         Ok(())
@@ -56,9 +58,11 @@ impl<'session> Session<'session> {
         let rc = SolClientReturnCode::from_raw(subscription_raw_rc);
 
         if !rc.is_ok() {
+            let subcode = get_last_error_info();
             return Err(SessionError::SubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),
                 rc,
+                subcode,
             ));
         }
         Ok(())
@@ -75,9 +79,11 @@ impl<'session> Session<'session> {
         let rc = SolClientReturnCode::from_raw(subscription_raw_rc);
 
         if !rc.is_ok() {
+            let subcode = get_last_error_info();
             return Err(SessionError::UnsubscriptionFailure(
                 c_topic.to_string_lossy().into_owned(),
                 rc,
+                subcode,
             ));
         }
         Ok(())
