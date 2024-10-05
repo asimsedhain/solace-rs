@@ -23,6 +23,16 @@ jobs:
       - run: cargo test --doc
 
   test:
+    services:
+      solace:
+        image: solace/solace-pubsub-standard:10.5
+        options: --shm-size=1gb
+        env: 
+          username_admin_globalaccesslevel: admin
+          username_admin_password: admin
+          system_scaling_maxconnectioncount: 100
+        ports:
+          - 55555:55555
     strategy:
       matrix:
         include:
