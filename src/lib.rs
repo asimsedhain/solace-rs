@@ -118,6 +118,8 @@ pub enum SessionError {
     InvalidArgsNulError(#[from] std::ffi::NulError),
     #[error("session failed to connect. SolClient return code: {0} subcode: {1}")]
     ConnectionFailure(SolClientReturnCode, SolClientSubCode),
+    #[error("session failed to disconnect. SolClient return code: {0} subcode: {1}")]
+    DisconnectError(SolClientReturnCode, SolClientSubCode),
     #[error("session failed to initialize. SolClient return code: {0} subcode: {1}")]
     InitializationFailure(SolClientReturnCode, SolClientSubCode),
     #[error("session failed to subscribe on topic. SolClient return code: {0} subcode: {1}")]

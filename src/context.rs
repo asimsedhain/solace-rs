@@ -133,7 +133,7 @@ impl Context {
         password: Password,
         on_message: Option<OnMessage>,
         on_event: Option<OnEvent>,
-    ) -> std::result::Result<Session<'session>, SessionBuilderError>
+    ) -> std::result::Result<Session<'session, OnMessage, OnEvent>, SessionBuilderError>
     where
         Host: Into<Vec<u8>>,
         Vpn: Into<Vec<u8>>,

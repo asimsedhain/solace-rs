@@ -15,7 +15,7 @@ use solace_rs::{
     Context, SolaceLogLevel,
 };
 
-static SLEEP_TIME: std::time::Duration = Duration::from_millis(500);
+static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
 
 const DEFAULT_HOST: &str = "worker-lenovo-yoga";
 const DEFAULT_PORT: &str = "55555";
@@ -407,11 +407,12 @@ fn auto_generate_tx_rx_session_fields() {
     let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
     let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
 
-    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
+
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "auto_generate_tx_rx_session_fields";
-
+    let send_count = 1000;
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let on_message = move |message: InboundMessage| {
         let _ = tx.send(message);
     };
@@ -436,7 +437,7 @@ fn auto_generate_tx_rx_session_fields() {
     // need to wait before publishing so that the client is properly subscribed
     sleep(SLEEP_TIME);
 
-    for msg in tx_msgs.clone() {
+    for msg in tx_msgs.clone().into_iter().cycle().take(send_count) {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
         let outbound_msg = OutboundMessageBuilder::new()
             .destination(dest)
@@ -447,24 +448,21 @@ fn auto_generate_tx_rx_session_fields() {
         session.publish(outbound_msg).expect("publishing message");
     }
     sleep(SLEEP_TIME);
+    let _ = session.disconnect();
+
+    drop(solace_context);
 
     let mut rx_count = 0;
-    loop {
-        match rx.try_recv() {
-            Ok(msg) => {
-                assert!(msg.get_receive_timestamp().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sender_id().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sender_timestamp().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sequence_number().is_ok_and(|v| v.is_some()));
+    while let Ok(msg) = rx.recv() {
+        assert!(msg.get_receive_timestamp().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sender_id().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sender_timestamp().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sequence_number().is_ok_and(|v| v.is_some()));
 
-                rx_count += 1;
-                if rx_count == tx_msgs.len() {
-                    break;
-                }
-            }
-            _ => panic!(),
-        }
+        rx_count += 1;
     }
+
+    assert!(rx_count == send_count);
 }
 
 #[test]
