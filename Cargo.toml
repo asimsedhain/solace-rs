@@ -1,6 +1,6 @@
 [package]
 name = "solace-rs"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 license = "MIT"
 rust-version = "1.70.0"
