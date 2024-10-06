@@ -6,7 +6,7 @@ use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use solace_rs_sys as ffi;
 use std::mem;
 use std::ptr;
-use std::sync::Once;
+use std::sync::OnceLock;
 use tracing::warn;
 
 use crate::message::InboundMessage;
@@ -19,8 +19,7 @@ pub(super) struct RawContext {
     pub(crate) ctx: ffi::solClient_opaqueContext_pt,
 }
 
-static SOLACE_GLOBAL_INIT: Once = Once::new();
-static mut SOLACE_GLOBAL_INIT_RC: i32 = 0;
+static SOLACE_GLOBAL_INIT: OnceLock<i32> = OnceLock::new();
 
 impl RawContext {
     /// .
@@ -34,12 +33,10 @@ impl RawContext {
     /// Context initializes global variables so it is not safe to have multiple solace contexts.
     /// .
     pub unsafe fn new(log_level: SolaceLogLevel) -> Result<Self> {
-        SOLACE_GLOBAL_INIT.call_once(|| {
-            SOLACE_GLOBAL_INIT_RC =
-                unsafe { ffi::solClient_initialize(log_level as u32, ptr::null_mut()) };
-        });
+        let rc = SOLACE_GLOBAL_INIT
+            .get_or_init(|| ffi::solClient_initialize(log_level as u32, ptr::null_mut()));
 
-        let rc = SolClientReturnCode::from_raw(SOLACE_GLOBAL_INIT_RC);
+        let rc = SolClientReturnCode::from_raw(*rc);
 
         if !rc.is_ok() {
             let subcode = get_last_error_info();
