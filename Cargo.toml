@@ -31,3 +31,5 @@ tracing = "0.1.37"
 [dev-dependencies]
 tracing-subscriber = "0.3.17"
 
+[lints.clippy]
+needless_return = 'allow'

@@ -175,7 +175,7 @@ where
     OnMessage: FnMut(InboundMessage) + Send + 'session,
     OnEvent: FnMut(SessionEvent) + Send + 'session,
 {
-    pub fn build(mut self) -> Result<Session<'session>> {
+    pub fn build(mut self) -> Result<Session<'session, OnMessage, OnEvent>> {
         let config = CheckedSessionProps::try_from(mem::take(&mut self.props))?;
 
         // Session props is a **char in C
@@ -193,20 +193,22 @@ where
         // causing a seg fault when dereffing in C land.
         // leaking is also fine since the lifetime of the closure is set to be the lifetime of the
         // session
-        let (static_on_message_callback, user_on_message) = match self.on_message {
-            Some(f) => (
-                on_message_trampoline(&f),
-                Box::into_raw(Box::new(Box::new(f))) as *mut _,
-            ),
-            _ => (None, ptr::null_mut()),
+        let (static_on_message_callback, user_on_message, msg_func_ptr) = match self.on_message {
+            Some(f) => {
+                let tramp = on_message_trampoline(&f);
+                let mut func = Box::new(Box::new(f));
+                (tramp, func.as_mut() as *const _ as *mut _, Some(func))
+            }
+            _ => (None, ptr::null_mut(), None),
         };
 
-        let (static_on_event_callback, user_on_event) = match self.on_event {
-            Some(f) => (
-                on_event_trampoline(&f),
-                Box::into_raw(Box::new(Box::new(f))) as *mut _,
-            ),
-            _ => (None, ptr::null_mut()),
+        let (static_on_event_callback, user_on_event, event_func_ptr) = match self.on_event {
+            Some(f) => {
+                let tramp = on_event_trampoline(&f);
+                let mut func = Box::new(Box::new(f));
+                (tramp, func.as_mut() as *const _ as *mut _, Some(func))
+            }
+            _ => (None, ptr::null_mut(), None),
         };
 
         // Function information for Session creation.
@@ -249,7 +251,9 @@ where
         let rc = SolClientReturnCode::from_raw(connection_raw_rc);
         if rc.is_ok() {
             Ok(Session {
-                _session_pt: session_pt,
+                _msg_fn_ptr: msg_func_ptr,
+                _event_fn_ptr: event_func_ptr,
+                _session_ptr: session_pt,
                 context: self.context,
                 lifetime: PhantomData,
             })

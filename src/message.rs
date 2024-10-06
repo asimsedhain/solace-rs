@@ -39,6 +39,17 @@ enum_from_primitive! {
     }
 }
 
+enum_from_primitive! {
+    #[derive(Debug, PartialEq, Eq)]
+    #[repr(i32)]
+    pub enum CacheStatus {
+        InvalidMessage=ffi::solClient_cacheStatus_SOLCLIENT_CACHE_INVALID_MESSAGE,
+        LiveMessage=ffi::solClient_cacheStatus_SOLCLIENT_CACHE_LIVE_MESSAGE,
+        CacheMessage=ffi::solClient_cacheStatus_SOLCLIENT_CACHE_MESSAGE,
+        SuspectMessage=ffi::solClient_cacheStatus_SOLCLIENT_CACHE_SUSPECT_MESSAGE,
+    }
+}
+
 impl From<ClassOfService> for u32 {
     fn from(val: ClassOfService) -> Self {
         match val {
@@ -240,6 +251,34 @@ pub trait Message<'a> {
             SolClientReturnCode::Fail => Err(MessageError::FieldError("destination", rc)),
             _ => Ok(Some(MessageDestination::from(dest_struct))),
         }
+    }
+
+    fn get_reply_to(&'a self) -> Result<Option<MessageDestination>> {
+        let mut dest_struct: ffi::solClient_destination = ffi::solClient_destination {
+            destType: ffi::solClient_destinationType_SOLCLIENT_NULL_DESTINATION,
+            dest: ptr::null_mut(),
+        };
+
+        let rc = unsafe {
+            ffi::solClient_msg_getReplyTo(
+                self.get_raw_message_ptr(),
+                &mut dest_struct,
+                mem::size_of::<ffi::solClient_destination>(),
+            )
+        };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        match rc {
+            SolClientReturnCode::NotFound => Ok(None),
+            SolClientReturnCode::Fail => Err(MessageError::FieldError("destination", rc)),
+            _ => Ok(Some(MessageDestination::from(dest_struct))),
+        }
+    }
+
+    fn is_reply(&'a self) -> bool {
+        let res = unsafe { ffi::solClient_msg_isReplyMsg(self.get_raw_message_ptr()) };
+        res != 0
     }
 
     fn get_sender_timestamp(&'a self) -> Result<Option<SystemTime>> {

@@ -1,7 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{mpsc, Arc},
-    thread::sleep,
+    num::NonZeroU32,
+    sync::{mpsc, Arc, Barrier},
+    thread::{self, sleep},
     time::Duration,
 };
 
@@ -406,11 +407,12 @@ fn auto_generate_tx_rx_session_fields() {
     let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
     let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
 
-    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let (tx, rx) = mpsc::channel();
+
     let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
     let topic = "auto_generate_tx_rx_session_fields";
-
+    let send_count = 1000;
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
     let on_message = move |message: InboundMessage| {
         let _ = tx.send(message);
     };
@@ -435,7 +437,7 @@ fn auto_generate_tx_rx_session_fields() {
     // need to wait before publishing so that the client is properly subscribed
     sleep(SLEEP_TIME);
 
-    for msg in tx_msgs.clone() {
+    for msg in tx_msgs.clone().into_iter().cycle().take(send_count) {
         let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
         let outbound_msg = OutboundMessageBuilder::new()
             .destination(dest)
@@ -446,22 +448,97 @@ fn auto_generate_tx_rx_session_fields() {
         session.publish(outbound_msg).expect("publishing message");
     }
     sleep(SLEEP_TIME);
+    let _ = session.disconnect();
+
+    drop(solace_context);
 
     let mut rx_count = 0;
-    loop {
-        match rx.try_recv() {
-            Ok(msg) => {
-                assert!(msg.get_receive_timestamp().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sender_id().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sender_timestamp().is_ok_and(|v| v.is_some()));
-                assert!(msg.get_sequence_number().is_ok_and(|v| v.is_some()));
+    while let Ok(msg) = rx.recv() {
+        assert!(msg.get_receive_timestamp().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sender_id().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sender_timestamp().is_ok_and(|v| v.is_some()));
+        assert!(msg.get_sequence_number().is_ok_and(|v| v.is_some()));
 
-                rx_count += 1;
-                if rx_count == tx_msgs.len() {
-                    break;
-                }
-            }
-            _ => panic!(),
-        }
+        rx_count += 1;
     }
+
+    assert!(rx_count == send_count);
+}
+
+#[test]
+#[ignore]
+fn request_and_reply() {
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
+    let topic = "request_and_reply";
+
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let g_barrier = Arc::new(Barrier::new(2));
+
+    thread::scope(|s| {
+        let context = solace_context.clone();
+        let barrier = g_barrier.clone();
+        // requester
+        let req = s.spawn(move || {
+            let session = context
+                .session(
+                    format!("tcp://{}:{}", host, port),
+                    "default",
+                    "default",
+                    "",
+                    Some(|_| {}),
+                    Some(|_| {}),
+                )
+                .unwrap();
+            barrier.wait();
+            sleep(SLEEP_TIME);
+
+            let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
+
+            let request = OutboundMessageBuilder::new()
+                .destination(dest)
+                .delivery_mode(DeliveryMode::Direct)
+                .payload("ping".to_string())
+                .build()
+                .expect("could not build message");
+            let reply = session
+                .request(request, NonZeroU32::new(5_000).unwrap())
+                .unwrap();
+            assert!(reply.get_payload().unwrap().unwrap() == b"pong");
+        });
+
+        let context = solace_context.clone();
+        let res = s.spawn(move || {
+            let (tx, rx) = mpsc::channel();
+            let session = context
+                .session(
+                    format!("tcp://{}:{}", host, port),
+                    "default",
+                    "default",
+                    "",
+                    Some(move |message: InboundMessage| {
+                        let _ = tx.send(message);
+                    }),
+                    Some(|_| {}),
+                )
+                .unwrap();
+            session.subscribe(topic).unwrap();
+
+            g_barrier.wait();
+
+            let msg = rx.recv().unwrap();
+
+            let reply_msg = OutboundMessageBuilder::new()
+                .destination(msg.get_reply_to().unwrap().unwrap())
+                .delivery_mode(DeliveryMode::Direct)
+                .payload("pong".to_string())
+                .is_reply(true)
+                .correlation_id(msg.get_correlation_id().unwrap().unwrap())
+                .build()
+                .expect("could not build message");
+            let _ = session.publish(reply_msg);
+        });
+        assert!(res.join().is_ok());
+        assert!(req.join().is_ok());
+    });
 }
