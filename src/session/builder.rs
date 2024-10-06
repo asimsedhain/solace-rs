@@ -229,15 +229,17 @@ where
                 },
             };
 
+        let context_ptr = self.context.raw.lock().unwrap();
         let session_create_raw_rc = unsafe {
             ffi::solClient_session_create(
                 raw_props.props.as_mut_ptr(),
-                self.context.raw.ctx,
+                context_ptr.ctx,
                 &mut session_pt,
                 &mut session_func_info,
                 std::mem::size_of::<ffi::solClient_session_createFuncInfo_t>(),
             )
         };
+        drop(context_ptr);
 
         let rc = SolClientReturnCode::from_raw(session_create_raw_rc);
 
