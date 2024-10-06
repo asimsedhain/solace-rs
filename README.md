@@ -17,7 +17,7 @@ Focuses on providing safe and idiomatic rust API over the C Solace library.
     - [x] Direct
     - [x] Persistent
 - [x] Solcache - (Untested)
-- [ ] Request Reply - TODO
+- [x] Request Reply
 - [ ] Async - TODO
 
 ## Installation

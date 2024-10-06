@@ -6,13 +6,14 @@ pub use event::SessionEvent;
 
 use crate::cache_session::CacheSession;
 use crate::context::Context;
-use crate::message::{Message, OutboundMessage};
+use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::util::get_last_error_info;
 use crate::SessionError;
 use crate::SolClientReturnCode;
-use solace_rs_sys as ffi;
+use solace_rs_sys::{self as ffi, solClient_opaqueMsg_pt};
 use std::ffi::CString;
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
 use tracing::warn;
 
 type Result<T> = std::result::Result<T, SessionError>;
@@ -87,6 +88,40 @@ impl<'session> Session<'session> {
             ));
         }
         Ok(())
+    }
+
+    pub fn request(
+        &self,
+        message: OutboundMessage,
+        timeout_ms: NonZeroU32,
+    ) -> Result<InboundMessage> {
+        let mut reply_ptr: solClient_opaqueMsg_pt = std::ptr::null_mut();
+
+        let rc = unsafe {
+            ffi::solClient_session_sendRequest(
+                self._session_pt,
+                message.get_raw_message_ptr(),
+                &mut reply_ptr,
+                timeout_ms.into(),
+            )
+        };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
+            // reply_ptr is always set to null if rc is not Ok
+            // https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/sol_client_8h.html#ac00adf1a9301ebe67fd0790523d5a44b
+            debug_assert!(reply_ptr.is_null());
+
+            let subcode = get_last_error_info();
+            return Err(SessionError::RequestError(rc, subcode));
+        }
+
+        debug_assert!(!reply_ptr.is_null());
+
+        let reply = InboundMessage::from(reply_ptr);
+
+        return Ok(reply);
     }
 
     pub fn cache_session<N>(

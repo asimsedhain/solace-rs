@@ -128,4 +128,6 @@ pub enum SessionError {
     CacheRequestFailure(SolClientReturnCode, SolClientSubCode),
     #[error("could not publish message. SolClient return code: {0}")]
     PublishError(SolClientReturnCode, SolClientSubCode),
+    #[error("could not send request. SolClient return code: {0}")]
+    RequestError(SolClientReturnCode, SolClientSubCode),
 }

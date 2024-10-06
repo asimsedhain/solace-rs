@@ -1,4 +1,4 @@
-use super::{Message, MessageError, Result};
+use super::{CacheStatus, Message, MessageError, Result};
 use crate::SolClientReturnCode;
 use enum_primitive::*;
 use solace_rs_sys as ffi;
@@ -71,6 +71,22 @@ impl fmt::Debug for InboundMessage {
         if self.get_destination().is_ok_and(|v| v.is_some()) {
             f.field("destination", &self.get_destination().unwrap().unwrap());
         }
+
+        f.field("is_reply", &self.is_reply());
+
+        if self.get_reply_to().is_ok_and(|v| v.is_some()) {
+            f.field("reply_to", &self.get_reply_to().unwrap().unwrap());
+        }
+
+        f.field("is_cache_msg", &self.is_cache_msg());
+
+        if self.get_cache_request_id().is_ok_and(|v| v.is_some()) {
+            f.field(
+                "cache_request_id",
+                &self.get_cache_request_id().unwrap().unwrap(),
+            );
+        }
+
         if self.get_payload().is_ok_and(|v| v.is_some()) {
             if let Ok(v) = std::str::from_utf8(self.get_payload().unwrap().unwrap()) {
                 f.field("payload", &v);
@@ -173,5 +189,10 @@ impl InboundMessage {
             SolClientReturnCode::NotFound => Ok(None),
             _ => Err(MessageError::FieldError("cache_request_id", rc)),
         }
+    }
+
+    pub fn is_cache_msg(&self) -> CacheStatus {
+        let raw = unsafe { ffi::solClient_msg_isCacheMsg(self.get_raw_message_ptr()) };
+        CacheStatus::from_i32(raw).unwrap_or(CacheStatus::InvalidMessage)
     }
 }

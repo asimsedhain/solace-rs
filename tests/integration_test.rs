@@ -1,7 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{mpsc, Arc},
-    thread::sleep,
+    num::NonZeroU32,
+    sync::{mpsc, Arc, Barrier},
+    thread::{self, sleep},
     time::Duration,
 };
 
@@ -14,7 +15,7 @@ use solace_rs::{
     Context, SolaceLogLevel,
 };
 
-static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
+static SLEEP_TIME: std::time::Duration = Duration::from_millis(500);
 
 const DEFAULT_HOST: &str = "worker-lenovo-yoga";
 const DEFAULT_PORT: &str = "55555";
@@ -464,4 +465,82 @@ fn auto_generate_tx_rx_session_fields() {
             _ => panic!(),
         }
     }
+}
+
+#[test]
+#[ignore]
+fn request_and_reply() {
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
+    let topic = "request_and_reply";
+
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let g_barrier = Arc::new(Barrier::new(2));
+
+    thread::scope(|s| {
+        let context = solace_context.clone();
+        let barrier = g_barrier.clone();
+        // requester
+        let req = s.spawn(move || {
+            let session = context
+                .session(
+                    format!("tcp://{}:{}", host, port),
+                    "default",
+                    "default",
+                    "",
+                    Some(|_| {}),
+                    Some(|_| {}),
+                )
+                .unwrap();
+            barrier.wait();
+            sleep(SLEEP_TIME);
+
+            let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
+
+            let request = OutboundMessageBuilder::new()
+                .destination(dest)
+                .delivery_mode(DeliveryMode::Direct)
+                .payload("ping".to_string())
+                .build()
+                .expect("could not build message");
+            let reply = session
+                .request(request, NonZeroU32::new(5_000).unwrap())
+                .unwrap();
+            assert!(reply.get_payload().unwrap().unwrap() == b"pong");
+        });
+
+        let context = solace_context.clone();
+        let res = s.spawn(move || {
+            let (tx, rx) = mpsc::channel();
+            let session = context
+                .session(
+                    format!("tcp://{}:{}", host, port),
+                    "default",
+                    "default",
+                    "",
+                    Some(move |message: InboundMessage| {
+                        let _ = tx.send(message);
+                    }),
+                    Some(|_| {}),
+                )
+                .unwrap();
+            session.subscribe(topic).unwrap();
+
+            g_barrier.wait();
+
+            let msg = rx.recv().unwrap();
+
+            let reply_msg = OutboundMessageBuilder::new()
+                .destination(msg.get_reply_to().unwrap().unwrap())
+                .delivery_mode(DeliveryMode::Direct)
+                .payload("pong".to_string())
+                .is_reply(true)
+                .correlation_id(msg.get_correlation_id().unwrap().unwrap())
+                .build()
+                .expect("could not build message");
+            let _ = session.publish(reply_msg);
+        });
+        assert!(res.join().is_ok());
+        assert!(req.join().is_ok());
+    });
 }

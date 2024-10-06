@@ -62,6 +62,7 @@ pub struct OutboundMessageBuilder {
     user_data: Option<Vec<u8>>,
     sender_ts: Option<SystemTime>,
     eliding_eligible: Option<()>,
+    is_reply: Option<()>,
 }
 
 impl OutboundMessageBuilder {
@@ -112,6 +113,15 @@ impl OutboundMessageBuilder {
 
     pub fn priority(mut self, priority: u8) -> Self {
         self.priority = Some(priority);
+        self
+    }
+
+    pub fn is_reply(mut self, is_reply: bool) -> Self {
+        if is_reply {
+            self.is_reply = Some(());
+        } else {
+            self.is_reply = None
+        }
         self
     }
 
@@ -301,6 +311,10 @@ impl OutboundMessageBuilder {
             unsafe { ffi::solClient_msg_setElidingEligible(msg_ptr, true.into()) };
         }
 
+        if self.is_reply.is_some() {
+            unsafe { ffi::solClient_msg_setAsReplyMsg(msg_ptr, true.into()) };
+        }
+
         Ok(OutboundMessage { _msg_ptr: msg_ptr })
     }
 }
@@ -344,6 +358,31 @@ mod tests {
             .unwrap();
 
         assert!(elided_msg.is_eliding_eligible());
+    }
+
+    #[test]
+    fn it_should_build_with_is_reply() {
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let non_reply_msg = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .is_reply(false)
+            .build()
+            .unwrap();
+
+        assert!(!non_reply_msg.is_reply());
+
+        let dest = MessageDestination::new(DestinationType::Topic, "test_topic").unwrap();
+        let reply_msg = OutboundMessageBuilder::new()
+            .delivery_mode(DeliveryMode::Direct)
+            .destination(dest)
+            .payload("Hello")
+            .is_reply(true)
+            .build()
+            .unwrap();
+
+        assert!(reply_msg.is_reply());
     }
 
     #[test]
