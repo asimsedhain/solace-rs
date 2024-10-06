@@ -6,6 +6,7 @@ use crate::{ContextError, SolClientReturnCode, SolaceLogLevel};
 use solace_rs_sys as ffi;
 use std::mem;
 use std::ptr;
+use std::sync::Mutex;
 use std::sync::OnceLock;
 use tracing::warn;
 
@@ -106,13 +107,13 @@ unsafe impl Sync for RawContext {}
 ///
 #[derive(Clone)]
 pub struct Context {
-    pub(super) raw: Arc<RawContext>,
+    pub(super) raw: Arc<Mutex<RawContext>>,
 }
 
 impl Context {
     pub fn new(log_level: SolaceLogLevel) -> std::result::Result<Self, ContextError> {
         Ok(Self {
-            raw: Arc::new(unsafe { RawContext::new(log_level) }?),
+            raw: Arc::new(Mutex::new(unsafe { RawContext::new(log_level) }?)),
         })
     }
 
