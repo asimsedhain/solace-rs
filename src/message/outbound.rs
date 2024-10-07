@@ -178,11 +178,15 @@ impl OutboundMessageBuilder {
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
         let rc = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
 
+
         let rc = SolClientReturnCode::from_raw(rc);
 
         if !rc.is_ok() {
             return Err(MessageBuilderError::MessageAlocFailure);
         };
+
+        // OutboundMessage is responsible for dropping the message in-case of any errors
+        let msg = OutboundMessage { _msg_ptr: msg_ptr };
 
         // We do not check the return code for many of the setter functions since they only fail
         // on invalid msg_ptr. We validated the message ptr above, so no need to double check.
@@ -315,7 +319,7 @@ impl OutboundMessageBuilder {
             unsafe { ffi::solClient_msg_setAsReplyMsg(msg_ptr, true.into()) };
         }
 
-        Ok(OutboundMessage { _msg_ptr: msg_ptr })
+        Ok(msg)
     }
 }
 
