@@ -36,11 +36,6 @@ fn bool_to_ptr(b: bool) -> *const i8 {
     }
 }
 
-struct RawSessionProps<'a> {
-    props: Vec<*const i8>,
-    lifetime: PhantomData<&'a CheckedSessionProps>,
-}
-
 struct UncheckedSessionProps<Host, Vpn, Username, Password> {
     // Note: required params
     // In the future we can use type state pattern to always force clients to provide these params
@@ -183,8 +178,6 @@ where
         // first we specify the key, then the value
         // Session also copies over the props and maintains a copy internally.
         // Note: Needs to live long enough for the values to be copied
-        let mut raw_props: RawSessionProps = (&config).into();
-
         let mut session_pt: ffi::solClient_opaqueSession_pt = ptr::null_mut();
 
         // Box::into_raw(Box::new(Box::new(f))) as *mut _
@@ -229,10 +222,11 @@ where
                 },
             };
 
+        let mut raw = config.to_raw();
         let context_ptr = self.context.raw.lock().unwrap();
         let session_create_raw_rc = unsafe {
             ffi::solClient_session_create(
-                raw_props.props.as_mut_ptr(),
+                raw.as_mut_ptr(),
                 context_ptr.ctx,
                 &mut session_pt,
                 &mut session_func_info,
@@ -440,141 +434,138 @@ struct CheckedSessionProps {
     modifyprop_timeout_ms: Option<CString>,
 }
 
-impl<'a> From<&'a CheckedSessionProps> for RawSessionProps<'a> {
-    fn from(value: &'a CheckedSessionProps) -> Self {
+impl CheckedSessionProps {
+    fn to_raw(&self) -> Vec<*const i8> {
         let mut props = vec![
             ffi::SOLCLIENT_SESSION_PROP_HOST.as_ptr() as *const i8,
-            value.host_name.as_ptr(),
+            self.host_name.as_ptr(),
             ffi::SOLCLIENT_SESSION_PROP_VPN_NAME.as_ptr() as *const i8,
-            value.vpn_name.as_ptr(),
+            self.vpn_name.as_ptr(),
             ffi::SOLCLIENT_SESSION_PROP_USERNAME.as_ptr() as *const i8,
-            value.username.as_ptr(),
+            self.username.as_ptr(),
             ffi::SOLCLIENT_SESSION_PROP_PASSWORD.as_ptr() as *const i8,
-            value.password.as_ptr(),
+            self.password.as_ptr(),
             ffi::SOLCLIENT_SESSION_PROP_CONNECT_BLOCKING.as_ptr() as *const i8,
             ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
         ];
 
-        if let Some(x) = &value.buffer_size_bytes {
+        if let Some(x) = &self.buffer_size_bytes {
             props.push(ffi::SOLCLIENT_SESSION_PROP_BUFFER_SIZE.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
 
-        if let Some(x) = &value.block_write_timeout_ms {
+        if let Some(x) = &self.block_write_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_BLOCKING_WRITE_TIMEOUT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.connect_timeout_ms {
+        if let Some(x) = &self.connect_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_TIMEOUT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
 
-        if let Some(x) = &value.subconfirm_timeout_ms {
+        if let Some(x) = &self.subconfirm_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_SUBCONFIRM_TIMEOUT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.ignore_dup_subscription_error {
+        if let Some(x) = &self.ignore_dup_subscription_error {
             props.push(
                 ffi::SOLCLIENT_SESSION_PROP_IGNORE_DUP_SUBSCRIPTION_ERROR.as_ptr() as *const i8,
             );
             props.push(bool_to_ptr(*x));
         }
 
-        if let Some(x) = &value.tcp_nodelay {
+        if let Some(x) = &self.tcp_nodelay {
             props.push(ffi::SOLCLIENT_SESSION_PROP_TCP_NODELAY.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.socket_send_buf_size_bytes {
+        if let Some(x) = &self.socket_send_buf_size_bytes {
             props.push(ffi::SOLCLIENT_SESSION_PROP_SOCKET_SEND_BUF_SIZE.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
 
-        if let Some(x) = &value.socket_rcv_buf_size_bytes {
+        if let Some(x) = &self.socket_rcv_buf_size_bytes {
             props.push(ffi::SOLCLIENT_SESSION_PROP_SOCKET_RCV_BUF_SIZE.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.keep_alive_interval_ms {
+        if let Some(x) = &self.keep_alive_interval_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_KEEP_ALIVE_INT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.keep_alive_limit {
+        if let Some(x) = &self.keep_alive_limit {
             props.push(ffi::SOLCLIENT_SESSION_PROP_KEEP_ALIVE_LIMIT.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.application_description {
+        if let Some(x) = &self.application_description {
             props.push(ffi::SOLCLIENT_SESSION_PROP_APPLICATION_DESCRIPTION.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.client_name {
+        if let Some(x) = &self.client_name {
             props.push(ffi::SOLCLIENT_SESSION_PROP_CLIENT_NAME.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
 
-        if let Some(x) = &value.compression_level {
+        if let Some(x) = &self.compression_level {
             props.push(ffi::SOLCLIENT_SESSION_PROP_COMPRESSION_LEVEL.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.generate_rcv_timestamps {
+        if let Some(x) = &self.generate_rcv_timestamps {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_RCV_TIMESTAMPS.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.generate_send_timestamp {
+        if let Some(x) = &self.generate_send_timestamp {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SEND_TIMESTAMPS.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.generate_sender_id {
+        if let Some(x) = &self.generate_sender_id {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SENDER_ID.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.generate_sender_sequence_number {
+        if let Some(x) = &self.generate_sender_sequence_number {
             props.push(ffi::SOLCLIENT_SESSION_PROP_GENERATE_SEQUENCE_NUMBER.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.connect_retries_per_host {
+        if let Some(x) = &self.connect_retries_per_host {
             props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_RETRIES_PER_HOST.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.connect_retries {
+        if let Some(x) = &self.connect_retries {
             props.push(ffi::SOLCLIENT_SESSION_PROP_CONNECT_RETRIES.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.reconnect_retries {
+        if let Some(x) = &self.reconnect_retries {
             props.push(ffi::SOLCLIENT_SESSION_PROP_RECONNECT_RETRIES.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.reconnect_retry_wait_ms {
+        if let Some(x) = &self.reconnect_retry_wait_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_RECONNECT_RETRY_WAIT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.reapply_subscriptions {
+        if let Some(x) = &self.reapply_subscriptions {
             props.push(ffi::SOLCLIENT_SESSION_PROP_REAPPLY_SUBSCRIPTIONS.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.provision_timeout_ms {
+        if let Some(x) = &self.provision_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_PROVISION_TIMEOUT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
-        if let Some(x) = &value.calculate_message_expiration {
+        if let Some(x) = &self.calculate_message_expiration {
             props.push(
                 ffi::SOLCLIENT_SESSION_PROP_CALCULATE_MESSAGE_EXPIRATION.as_ptr() as *const i8,
             );
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.no_local {
+        if let Some(x) = &self.no_local {
             props.push(ffi::SOLCLIENT_SESSION_PROP_NO_LOCAL.as_ptr() as *const i8);
             props.push(bool_to_ptr(*x));
         }
-        if let Some(x) = &value.modifyprop_timeout_ms {
+        if let Some(x) = &self.modifyprop_timeout_ms {
             props.push(ffi::SOLCLIENT_SESSION_PROP_MODIFYPROP_TIMEOUT_MS.as_ptr() as *const i8);
             props.push(x.as_ptr());
         }
 
         props.push(ptr::null());
 
-        Self {
-            props,
-            lifetime: PhantomData,
-        }
+        props
     }
 }
 
