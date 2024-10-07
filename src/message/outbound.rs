@@ -260,7 +260,8 @@ impl OutboundMessageBuilder {
         // correlation_id
         if let Some(id) = self.correlation_id {
             // correlation_id is copied over
-            unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, CString::new(id)?.as_ptr()) };
+            let c_id = CString::new(id)?;
+            unsafe { ffi::solClient_msg_setCorrelationId(msg_ptr, c_id.as_ptr()) };
         }
 
         // Class of Service
@@ -294,20 +295,15 @@ impl OutboundMessageBuilder {
         // Application ID
         if let Some(id) = self.application_id {
             // application id is copied over
-            unsafe {
-                ffi::solClient_msg_setApplicationMessageId(msg_ptr, CString::new(id)?.as_ptr())
-            };
+            let c_id = CString::new(id)?;
+            unsafe { ffi::solClient_msg_setApplicationMessageId(msg_ptr, c_id.as_ptr()) };
         }
 
         // Application Message Type
         if let Some(message_type) = self.application_msg_type {
             // application msg type is copied over
-            unsafe {
-                ffi::solClient_msg_setApplicationMsgType(
-                    msg_ptr,
-                    CString::new(message_type)?.as_ptr(),
-                )
-            };
+            let c_type = CString::new(message_type)?;
+            unsafe { ffi::solClient_msg_setApplicationMsgType(msg_ptr, c_type.as_ptr()) };
         }
 
         if self.eliding_eligible.is_some() {
