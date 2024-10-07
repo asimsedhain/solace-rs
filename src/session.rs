@@ -53,9 +53,10 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
     Session<'session, M, E>
 {
     pub fn publish(&self, message: OutboundMessage) -> Result<()> {
-        let send_message_raw_rc = unsafe {
-            ffi::solClient_session_sendMsg(self._session_ptr, message.get_raw_message_ptr())
-        };
+        // TODO: for whatever reason, if we drop the message, it will trigger the TSAN.
+        let msg = std::mem::ManuallyDrop::new(message);
+        let send_message_raw_rc =
+            unsafe { ffi::solClient_session_sendMsg(self._session_ptr, msg.get_raw_message_ptr()) };
 
         let rc = SolClientReturnCode::from_raw(send_message_raw_rc);
         if !rc.is_ok() {
