@@ -178,7 +178,6 @@ impl OutboundMessageBuilder {
         let mut msg_ptr: ffi::solClient_opaqueMsg_pt = ptr::null_mut();
         let rc = unsafe { ffi::solClient_msg_alloc(&mut msg_ptr) };
 
-
         let rc = SolClientReturnCode::from_raw(rc);
 
         if !rc.is_ok() {
