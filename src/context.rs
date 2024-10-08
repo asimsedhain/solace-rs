@@ -90,16 +90,12 @@ impl Drop for RawContext {
 
 unsafe impl Send for RawContext {}
 
-unsafe impl Sync for RawContext {}
-
 /// Handle for a Solace context, used to create sessions.
 ///
 /// It is thread safe, and can be safely cloned and shared. Each clone
 /// references the same underlying C context. Internally, an `Arc` is
 /// used to implement this in a threadsafe way.
 ///
-/// Important: Only initialize one context per application as it initializes global variables upon
-/// creation.
 /// Also note that this binding deviates from the C API in that each
 /// session created from a context initially owns a clone of that
 /// context.
