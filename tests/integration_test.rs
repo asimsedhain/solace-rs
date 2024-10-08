@@ -434,6 +434,9 @@ fn auto_generate_tx_rx_session_fields() {
         .password("")
         .on_message(on_message)
         .on_event(|_: SessionEvent| {})
+        // NOTE: there is bug in the solace lib where it does not copy over the message if there is
+        // not enough space in the buffer. This can cause the TSan to trigger.
+        .buffer_size_bytes(900_000)
         .generate_rcv_timestamps(true)
         .generate_sender_id(true)
         .generate_send_timestamp(true)
