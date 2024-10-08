@@ -32,6 +32,7 @@ unsafe impl Send for OutboundMessage {}
 
 impl Drop for OutboundMessage {
     fn drop(&mut self) {
+        debug_assert!(!self._msg_ptr.is_null());
         let msg_free_result = unsafe { ffi::solClient_msg_free(&mut self._msg_ptr) };
 
         let rc = SolClientReturnCode::from_raw(msg_free_result);
