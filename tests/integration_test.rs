@@ -452,8 +452,11 @@ fn auto_generate_tx_rx_session_fields() {
 
     drop(solace_context);
 
+    let mut iter = tx_msgs.clone().into_iter().cycle();
+
     let mut rx_count = 0;
     while let Ok(msg) = rx.recv() {
+        assert!(msg.get_payload().unwrap().unwrap() == iter.next().unwrap().as_bytes());
         assert!(msg.get_receive_timestamp().is_ok_and(|v| v.is_some()));
         assert!(msg.get_sender_id().is_ok_and(|v| v.is_some()));
         assert!(msg.get_sender_timestamp().is_ok_and(|v| v.is_some()));
