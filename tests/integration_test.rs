@@ -15,7 +15,7 @@ use solace_rs::{
     Context, SolaceLogLevel,
 };
 
-static SLEEP_TIME: std::time::Duration = Duration::from_millis(10);
+static SLEEP_TIME: std::time::Duration = Duration::from_millis(300);
 
 const DEFAULT_HOST: &str = "worker-lenovo-yoga";
 const DEFAULT_PORT: &str = "55555";
