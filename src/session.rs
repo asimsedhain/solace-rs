@@ -44,10 +44,6 @@ unsafe impl<M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send> Send
     for Session<'_, M, E>
 {
 }
-unsafe impl<M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send> Sync
-    for Session<'_, M, E>
-{
-}
 
 impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
     Session<'session, M, E>

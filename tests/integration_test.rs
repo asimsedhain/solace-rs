@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     num::NonZeroU32,
-    sync::{mpsc, Arc, Barrier},
+    sync::{mpsc, Arc, Barrier, Mutex},
     thread::{self, sleep},
     time::Duration,
 };
@@ -281,7 +281,7 @@ fn multi_thread_publisher() {
         let _ = tx.send(payload.to_owned());
     };
 
-    let session = Arc::new(
+    let session = Arc::new(Mutex::new(
         solace_context
             .session(
                 format!("tcp://{}:{}", host, port),
@@ -292,48 +292,57 @@ fn multi_thread_publisher() {
                 Some(|_: SessionEvent| {}),
             )
             .expect("creating session"),
-    );
+    ));
 
-    session.subscribe(topic).expect("multi_thread_publisher");
+    session
+        .lock()
+        .unwrap()
+        .subscribe(topic)
+        .expect("multi_thread_publisher");
 
     // need to wait before publishing so that the client is properly subscribed
     sleep(SLEEP_TIME);
 
+    let mut handles = vec![];
+
     for _ in 0..msg_multiplier {
         let session_clone = session.clone();
         let tx_msgs_clone = tx_msgs.clone();
-        std::thread::spawn(move || {
-            for msg in tx_msgs_clone {
+        let thread_h = std::thread::spawn(move || {
+            let session_clone_lock = session_clone.lock().unwrap();
+            for msg in &tx_msgs_clone {
                 let dest = MessageDestination::new(DestinationType::Topic, topic).unwrap();
                 let outbound_msg = OutboundMessageBuilder::new()
                     .destination(dest)
                     .delivery_mode(DeliveryMode::Direct)
-                    .payload(msg)
+                    .payload(*msg)
                     .build()
                     .expect("building outbound msg");
-                session_clone
+                session_clone_lock
                     .publish(outbound_msg)
                     .expect("publishing message");
             }
+            drop(session_clone_lock);
         });
+        handles.push(thread_h);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
     }
 
     sleep(SLEEP_TIME);
+    drop(session);
+    drop(solace_context);
 
     let mut rx_msgs = vec![];
 
-    loop {
-        match rx.try_recv() {
-            Ok(msg) => {
-                let str = String::from_utf8_lossy(&msg).to_string();
-                rx_msgs.push(str);
-                if rx_msgs.len() == tx_msgs.len() * msg_multiplier {
-                    break;
-                }
-            }
-            _ => panic!(),
-        }
+    while let Ok(msg) = rx.recv() {
+        let str = String::from_utf8_lossy(&msg).to_string();
+        rx_msgs.push(str);
     }
+
+    assert!(rx_msgs.len() == tx_msgs.len() * msg_multiplier);
 
     let mut rx_msg_map = HashMap::new();
     for msg in rx_msgs {
