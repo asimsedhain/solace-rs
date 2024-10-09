@@ -67,3 +67,38 @@ jobs:
           SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
       - run: cd solace-rs-sys && cargo test --release
 
+  sanitizers:
+    services:
+      solace:
+        image: solace/solace-pubsub-standard:10.5
+        options: --shm-size=1gb
+        env: 
+          username_admin_globalaccesslevel: admin
+          username_admin_password: admin
+          system_scaling_maxconnectioncount: 100
+        ports:
+          - 55555:55555
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            sanitizer: 'address'
+          - os: ubuntu-20.04
+            sanitizer: 'thread'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@b44cb146d03e8d870c57ab64b80f04586349ca5d
+        with:
+          # sanitizers are only available on nightly
+          # https://doc.rust-lang.org/beta/unstable-book/compiler-flags/sanitizer.html
+          toolchain: nightly
+          targets: x86_64-unknown-linux-gnu
+          components: rust-src
+      - run: cargo test -Zbuild-std --release --target x86_64-unknown-linux-gnu -- --include-ignored
+        env:
+          SOLACE_HOST: 0.0.0.0
+          SOLACE_PORT: ${{ job.services.solace.ports[55555] }}
+          RUSTFLAGS: -Zsanitizer=${{ matrix.sanitizer }}
+      - run: cd solace-rs-sys && cargo test --release
+
