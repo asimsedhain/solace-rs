@@ -1,6 +1,6 @@
 [package]
 name = "solace-rs-sys"
-version = "1.0.1"
+version = "1.1.0"
 rust-version = "1.70.0"
 edition = "2021"
 license = "MIT"
@@ -17,6 +17,8 @@ documentation = "https://github.com/asimsedhain/solace-rs"
 [build-dependencies]
 bindgen = "0.66.1"
 tar = "0.4.38"
-ureq = "2.10.1"
+ureq = { version = "2.10.1", features = ["tls"]}
 flate2 = "1.0.26"
 cfg-if = "1.0"
+rustls = {version = "0.23.16", features = ["ring"]}
+rustls-native-certs = "0.8.0"

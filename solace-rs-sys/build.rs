@@ -1,5 +1,7 @@
 extern crate bindgen;
+use std::sync::Arc;
 use std::{env, io::Write, path::PathBuf};
+use ureq::Agent;
 
 #[cfg(target_os = "windows")]
 const SOLCLIENT_GZ_PATH: &str = "solclient_Win_vs2015_7.26.1.8.tar.gz";
@@ -16,13 +18,30 @@ const SOLCLIENT_GZ_PATH: &str = "solclient_Linux-aarch64_opt_7.26.1.8.tar.gz";
 #[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "musl"))]
 const SOLCLIENT_GZ_PATH: &str = "solclient_Linux_musl-x86_64_opt_7.26.1.8.tar.gz";
 
+fn build_ureq_agent() -> Agent {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
+    let mut root_store = rustls::RootCertStore::empty();
+    for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
+        root_store.add(cert).unwrap();
+    }
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    ureq::builder().tls_config(Arc::new(tls_config)).build()
+}
 fn download_and_unpack(url: &str, tarball_path: PathBuf, tarball_unpack_path: PathBuf) {
     let mut content = Vec::new();
-    let _ = ureq::get(url)
+    build_ureq_agent()
+        .get(url)
         .call()
         .unwrap()
         .into_reader()
-        .read_to_end(&mut content);
+        .read_to_end(&mut content)
+        .unwrap();
 
     let mut file_gz = std::fs::File::create(tarball_path.clone()).unwrap();
     file_gz.write_all(&content).unwrap();
