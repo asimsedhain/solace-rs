@@ -54,7 +54,7 @@ impl RawContext {
             };
 
         // enable context thread
-        let mut conext_props: [*const i8; 3] = [
+        let mut context_props: [*const i8; 3] = [
             solace_rs_sys::SOLCLIENT_CONTEXT_PROP_CREATE_THREAD.as_ptr() as *const i8,
             solace_rs_sys::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8,
             ptr::null(),
@@ -62,7 +62,7 @@ impl RawContext {
 
         let solace_context_raw_rc = unsafe {
             ffi::solClient_context_create(
-                conext_props.as_mut_ptr(),
+                context_props.as_mut_ptr(),
                 &mut ctx,
                 &mut context_func,
                 mem::size_of::<ffi::solClient_context_createRegisterFdFuncInfo>(),
