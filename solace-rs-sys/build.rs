@@ -64,12 +64,6 @@ fn download_and_unpack(url: &str, tarball_path: PathBuf, tarball_unpack_path: Pa
 }
 
 fn main() {
-    cfg_if::cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            panic!("Windows currently not supported");
-        }
-    }
-
     // do nothing if we are just building the docs
     if std::env::var("DOCS_RS").is_ok() {
         return;
@@ -118,8 +112,18 @@ fn main() {
         }
     }
 
-    println!("cargo:rustc-link-lib=static=crypto");
-    println!("cargo:rustc-link-lib=static=ssl");
-    println!("cargo:rustc-link-lib=static=solclient");
-    println!("cargo:rustc-link-lib=static=solclientssl");
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "windows")] {
+            println!("cargo:rustc-link-search=native={}", lib_dir.join("Win64").display());
+            println!("cargo:rustc-link-search=native={}", lib_dir.join("Win64/third-party").display());
+            println!("cargo:rustc-link-lib-static=libcrypto_s");
+            println!("cargo:rustc-link-lib-static=libssl_s");
+            println!("cargo:rustc-link-lib=libsolclient_s");
+        } else {
+            println!("cargo:rustc-link-lib=static=crypto");
+            println!("cargo:rustc-link-lib=static=ssl");
+            println!("cargo:rustc-link-lib=static=solclient");
+            println!("cargo:rustc-link-lib=static=solclientssl");
+        }
+    }
 }
