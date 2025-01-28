@@ -63,7 +63,7 @@ cargo run --example <example_name> -- <example_args>
 
 ## Minimum supported Rust version (MSRV)
 
-The current minimum supported Rust version (MSRV) is 1.70.0.
+The current minimum supported Rust version (MSRV) is 1.81
 
 ## OS Support / CI Tests
 
