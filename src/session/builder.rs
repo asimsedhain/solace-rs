@@ -8,7 +8,10 @@ use std::{
 use crate::{
     message::InboundMessage,
     session::SessionEvent,
-    util::{get_last_error_info, on_event_trampoline, on_message_trampoline},
+    util::{
+        get_last_error_info, on_event_trampoline, on_message_trampoline, static_no_op_on_event,
+        static_no_op_on_message,
+    },
     Context, Session, SolClientReturnCode, SolClientSubCode,
 };
 
@@ -192,7 +195,11 @@ where
                 let mut func = Box::new(Box::new(f));
                 (tramp, func.as_mut() as *const _ as *mut _, Some(func))
             }
-            _ => (None, ptr::null_mut(), None),
+            _ => (
+                Some(static_no_op_on_message as unsafe extern "C" fn(_, _, _) -> u32),
+                ptr::null_mut(),
+                None,
+            ),
         };
 
         let (static_on_event_callback, user_on_event, event_func_ptr) = match self.on_event {
@@ -201,7 +208,11 @@ where
                 let mut func = Box::new(Box::new(f));
                 (tramp, func.as_mut() as *const _ as *mut _, Some(func))
             }
-            _ => (None, ptr::null_mut(), None),
+            _ => (
+                Some(static_no_op_on_event as unsafe extern "C" fn(_, _, _)),
+                ptr::null_mut(),
+                None,
+            ),
         };
 
         // Function information for Session creation.

@@ -7,18 +7,30 @@ use crate::SolClientSubCode;
 use solace_rs_sys as ffi;
 use std::mem;
 
-pub fn on_message_trampoline<'s, F>(_closure: &'s F) -> ffi::solClient_session_rxMsgCallbackFunc_t
+pub(crate) fn on_message_trampoline<'s, F>(
+    _closure: &'s F,
+) -> ffi::solClient_session_rxMsgCallbackFunc_t
 where
     F: FnMut(InboundMessage) + Send + 's,
 {
     Some(static_on_message::<F>)
 }
 
-pub fn on_event_trampoline<'s, F>(_closure: &'s F) -> ffi::solClient_session_eventCallbackFunc_t
+pub(crate) fn on_event_trampoline<'s, F>(
+    _closure: &'s F,
+) -> ffi::solClient_session_eventCallbackFunc_t
 where
     F: FnMut(SessionEvent) + Send + 's,
 {
     Some(static_on_event::<F>)
+}
+
+pub(crate) extern "C" fn static_no_op_on_message(
+    _opaque_session_p: ffi::solClient_opaqueSession_pt,
+    _msg_p: ffi::solClient_opaqueMsg_pt,
+    _raw_user_closure: *mut ::std::os::raw::c_void,
+) -> ffi::solClient_rxMsgCallback_returnCode_t {
+    ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK
 }
 
 extern "C" fn static_on_message<'s, F>(
@@ -48,6 +60,13 @@ where
     user_closure(message);
 
     ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_TAKE_MSG
+}
+
+pub(crate) extern "C" fn static_no_op_on_event(
+    _opaque_session_p: ffi::solClient_opaqueSession_pt, // non-null
+    _event_info_p: ffi::solClient_session_eventCallbackInfo_pt, //non-null
+    _raw_user_closure: *mut ::std::os::raw::c_void,     // can be null
+) {
 }
 
 extern "C" fn static_on_event<'s, F>(
