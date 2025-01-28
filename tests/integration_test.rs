@@ -45,7 +45,7 @@ fn subscribe_and_publish() {
             "default",
             "",
             Some(on_message),
-            Some(|_: SessionEvent| {}),
+            None::<fn(SessionEvent)>,
         )
         .expect("creating session");
     session.subscribe(topic).expect("subscribing to topic");
@@ -204,7 +204,7 @@ fn unsubscribe_and_publish() {
             "default",
             "",
             Some(on_message),
-            Some(|_: SessionEvent| {}),
+            None::<fn(SessionEvent)>,
         )
         .expect("creating session");
     session.subscribe(topic).expect("subscribing to topic");
@@ -289,7 +289,7 @@ fn multi_thread_publisher() {
                 "default",
                 "",
                 Some(on_message),
-                Some(|_: SessionEvent| {}),
+                None::<fn(SessionEvent)>,
             )
             .expect("creating session"),
     ));
@@ -501,8 +501,8 @@ fn request_and_reply() {
                     "default",
                     "default",
                     "",
-                    Some(|_| {}),
-                    Some(|_| {}),
+                    None::<fn(InboundMessage)>,
+                    None::<fn(SessionEvent)>,
                 )
                 .unwrap();
             barrier.wait();
@@ -534,7 +534,7 @@ fn request_and_reply() {
                     Some(move |message: InboundMessage| {
                         let _ = tx.send(message);
                     }),
-                    Some(|_| {}),
+                    None::<fn(SessionEvent)>,
                 )
                 .unwrap();
             session.subscribe(topic).unwrap();
