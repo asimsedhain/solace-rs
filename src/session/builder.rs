@@ -9,8 +9,8 @@ use crate::{
     message::InboundMessage,
     session::SessionEvent,
     util::{
-        get_last_error_info, on_event_trampoline, on_message_trampoline, static_no_op_on_event,
-        static_no_op_on_message,
+        bool_to_ptr, get_last_error_info, on_event_trampoline, on_message_trampoline,
+        static_no_op_on_event, static_no_op_on_message,
     },
     Context, Session, SolClientReturnCode, SolClientSubCode,
 };
@@ -30,14 +30,6 @@ pub enum SessionBuilderError {
 }
 
 type Result<T> = std::result::Result<T, SessionBuilderError>;
-
-fn bool_to_ptr(b: bool) -> *const i8 {
-    if b {
-        ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8
-    } else {
-        ffi::SOLCLIENT_PROP_DISABLE_VAL.as_ptr() as *const i8
-    }
-}
 
 struct UncheckedSessionProps<Host, Vpn, Username, Password> {
     // Note: required params
