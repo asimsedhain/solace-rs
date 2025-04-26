@@ -164,12 +164,21 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
         Ok(())
     }
 
-    pub fn endpoint_provision(&self, endpoint_props: EndpointProps) -> Result<()> {
+    pub fn endpoint_provision(
+        &self,
+        endpoint_props: EndpointProps,
+        ignore_already_exists_error: bool,
+    ) -> Result<()> {
+        let mut flag = ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM;
+        if ignore_already_exists_error {
+            flag |= ffi::SOLCLIENT_PROVISION_FLAGS_IGNORE_EXIST_ERRORS;
+        }
+
         let rc = unsafe {
             ffi::solClient_session_endpointProvision(
                 endpoint_props.to_raw().as_mut_ptr(),
                 self._session_ptr,
-                ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM,
+                flag,
                 std::ptr::null_mut(),
                 // deprecated params
                 std::ptr::null_mut(),
@@ -186,12 +195,21 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
         Ok(())
     }
 
-    pub fn endpoint_deprovision(&self, endpoint_props: EndpointProps) -> Result<()> {
+    pub fn endpoint_deprovision(
+        &self,
+        endpoint_props: EndpointProps,
+        ignore_already_exists_error: bool,
+    ) -> Result<()> {
+        let mut flag = ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM;
+        if ignore_already_exists_error {
+            flag |= ffi::SOLCLIENT_PROVISION_FLAGS_IGNORE_EXIST_ERRORS;
+        }
+
         let rc = unsafe {
             ffi::solClient_session_endpointDeprovision(
                 endpoint_props.to_raw().as_mut_ptr(),
                 self._session_ptr,
-                ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM,
+                flag,
                 std::ptr::null_mut(),
             )
         };

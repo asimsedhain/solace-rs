@@ -49,7 +49,9 @@ fn main() {
         .build()
         .unwrap();
 
-    session.endpoint_provision(endpoint_props.clone()).unwrap();
+    session
+        .endpoint_provision(endpoint_props.clone(), true)
+        .unwrap();
     println!("Provisioned endpoint try-me");
 
     let sleep_duration = Duration::from_secs(5);
@@ -59,6 +61,6 @@ fn main() {
     );
     thread::sleep(sleep_duration);
 
-    session.endpoint_deprovision(endpoint_props).unwrap();
+    session.endpoint_deprovision(endpoint_props, true).unwrap();
     println!("Deprovisioned endpoint try-me");
 }
