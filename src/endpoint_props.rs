@@ -21,12 +21,8 @@ pub enum EndpointPropsBuilderError {
 
 /// Endpoint Configuration Properties
 /// https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/group__endpoint_props.html
-pub struct EndpointPropsBuilder<Id, Name> {
-    // Note: required params
-    // In the future we can use type state pattern to always force clients to provide these params
-    id: Option<Id>,
-    name: Option<Name>,
-
+pub struct EndpointPropsBuilder {
+    id: Option<EndpointId<String>>,
     durable: Option<bool>,
     permission: Option<EndpointPermission>,
     access_type: Option<EndpointAccessType>,
@@ -37,16 +33,11 @@ pub struct EndpointPropsBuilder<Id, Name> {
     max_msg_redelivery: Option<u64>,
 }
 
-impl<Id, Name> EndpointPropsBuilder<Id, Name>
-where
-    Id: Into<EndpointId>,
-    Name: Into<String>,
-{
+impl EndpointPropsBuilder {
     /// Creates a new `EndpointPropsBuilder` with default properties.
     pub fn new() -> Self {
         Self {
             id: None,
-            name: None,
             durable: None,
             permission: None,
             access_type: None,
@@ -58,13 +49,8 @@ where
         }
     }
 
-    pub fn id(mut self, id: Id) -> Self {
+    pub fn id(mut self, id: EndpointId<String>) -> Self {
         self.id = Some(id);
-        self
-    }
-
-    pub fn name(mut self, name: Name) -> Self {
-        self.name = Some(name);
         self
     }
 
@@ -102,24 +88,7 @@ where
     }
 
     pub fn build(self) -> Result<EndpointProps> {
-        println!("Building EndpointProps");
-
-        let id = match self.id {
-            Some(id) => id.into(),
-            None => {
-                return Err(EndpointPropsBuilderError::MissingRequiredArgs(
-                    "id".to_string(),
-                ))
-            }
-        };
-        let name = match self.name {
-            Some(name) => CString::new(name.into())?,
-            None => {
-                return Err(EndpointPropsBuilderError::MissingRequiredArgs(
-                    "name".to_string(),
-                ))
-            }
-        };
+        let id = self.id.map(|i| i.try_into()).transpose()?;
         let durable = self.durable;
         let permission = self.permission;
         let access_type = self.access_type;
@@ -140,7 +109,6 @@ where
 
         Ok(EndpointProps {
             id,
-            name,
             durable,
             permission,
             access_type,
@@ -153,12 +121,9 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EndpointProps {
-    id: EndpointId,
-    name: CString,
-
-    // Note: optional params
+    id: Option<EndpointId<CString>>,
     durable: Option<bool>,
     permission: Option<EndpointPermission>,
     access_type: Option<EndpointAccessType>,
@@ -171,12 +136,28 @@ pub struct EndpointProps {
 
 impl EndpointProps {
     pub fn to_raw(&self) -> Vec<*const i8> {
-        let mut props = vec![
-            ffi::SOLCLIENT_ENDPOINT_PROP_ID.as_ptr() as *const i8,
-            self.id.as_ptr(),
-            ffi::SOLCLIENT_ENDPOINT_PROP_NAME.as_ptr() as *const i8,
-            self.name.as_ptr() as *const i8,
-        ];
+        let mut props = vec![];
+
+        if let Some(id) = &self.id {
+            props.push(ffi::SOLCLIENT_ENDPOINT_PROP_ID.as_ptr() as *const i8);
+            match id {
+                EndpointId::Queue { name } => {
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_QUEUE.as_ptr() as *const i8);
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_NAME.as_ptr() as *const i8);
+                    props.push(name.as_ptr());
+                }
+                EndpointId::Te { name } => {
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_TE.as_ptr() as *const i8);
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_NAME.as_ptr() as *const i8);
+                    props.push(name.as_ptr());
+                }
+                EndpointId::ClientName { name } => {
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_CLIENT_NAME.as_ptr() as *const i8);
+                    props.push(ffi::SOLCLIENT_ENDPOINT_PROP_NAME.as_ptr() as *const i8);
+                    props.push(name.as_ptr());
+                }
+            }
+        }
 
         if let Some(durable) = self.durable {
             props.push(ffi::SOLCLIENT_ENDPOINT_PROP_DURABLE.as_ptr() as *const i8);
@@ -224,21 +205,27 @@ impl EndpointProps {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Default, Clone)]
-pub enum EndpointId {
-    Queue,
-    #[default]
-    Te,
-    ClientName,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EndpointId<T> {
+    Queue { name: T },
+    Te { name: T },
+    ClientName { name: T },
 }
-impl EndpointId {
-    fn as_ptr(&self) -> *const i8 {
-        match self {
-            Self::Queue => ffi::SOLCLIENT_ENDPOINT_PROP_QUEUE,
-            Self::Te => ffi::SOLCLIENT_ENDPOINT_PROP_TE,
-            Self::ClientName => ffi::SOLCLIENT_ENDPOINT_PROP_CLIENT_NAME,
+impl TryFrom<EndpointId<String>> for EndpointId<CString> {
+    type Error = EndpointPropsBuilderError;
+
+    fn try_from(value: EndpointId<String>) -> Result<Self> {
+        match value {
+            EndpointId::Queue { name } => Ok(EndpointId::Queue {
+                name: CString::new(name)?,
+            }),
+            EndpointId::Te { name } => Ok(EndpointId::Te {
+                name: CString::new(name)?,
+            }),
+            EndpointId::ClientName { name } => Ok(EndpointId::ClientName {
+                name: CString::new(name)?,
+            }),
         }
-        .as_ptr() as *const i8
     }
 }
 

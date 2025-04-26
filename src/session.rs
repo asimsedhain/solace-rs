@@ -7,6 +7,7 @@ pub use event::SessionEvent;
 use crate::cache_session::CacheSession;
 use crate::context::Context;
 use crate::endpoint_props::EndpointProps;
+use crate::flow::builder::FlowBuilder;
 use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::util::get_last_error_info;
 use crate::SessionError;
@@ -221,6 +222,12 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
             return Err(SessionError::EndpointProvisionError(rc, subcode));
         }
         Ok(())
+    }
+
+    pub fn flow_builder<'builder, OnMessage, OnEvent>(
+        &'builder self,
+    ) -> FlowBuilder<'builder, 'session, M, E, OnMessage, OnEvent> {
+        FlowBuilder::new(&self)
     }
 }
 
