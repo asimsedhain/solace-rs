@@ -1,4 +1,3 @@
-use enum_primitive::*;
 use solace_rs_sys as ffi;
 use std::{
     ffi::{CString, NulError},
@@ -225,14 +224,12 @@ impl EndpointProps {
     }
 }
 
-enum_from_primitive! {
-    #[derive(Debug, PartialEq, Eq, Default, Clone)]
-    pub enum EndpointId {
-        Queue,
-        #[default]
-        Te,
-        ClientName,
-    }
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
+pub enum EndpointId {
+    Queue,
+    #[default]
+    Te,
+    ClientName,
 }
 impl EndpointId {
     fn as_ptr(&self) -> *const i8 {
@@ -245,15 +242,13 @@ impl EndpointId {
     }
 }
 
-enum_from_primitive! {
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum EndpointPermission {
-        Delete,
-        ModifyTopic,
-        Consume,
-        ReadOnly,
-        None,
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EndpointPermission {
+    Delete,
+    ModifyTopic,
+    Consume,
+    ReadOnly,
+    None,
 }
 impl EndpointPermission {
     pub fn as_ptr(&self) -> *const i8 {
@@ -268,12 +263,10 @@ impl EndpointPermission {
     }
 }
 
-enum_from_primitive! {
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum EndpointAccessType {
-        Exclusive,
-        NonExclusive,
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EndpointAccessType {
+    Exclusive,
+    NonExclusive,
 }
 impl EndpointAccessType {
     pub fn as_ptr(&self) -> *const i8 {
@@ -285,12 +278,10 @@ impl EndpointAccessType {
     }
 }
 
-enum_from_primitive! {
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum EndpointDiscardBehavior {
-        DiscardNotifySenderOff,
-        DiscardNotifySenderOn,
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EndpointDiscardBehavior {
+    DiscardNotifySenderOff,
+    DiscardNotifySenderOn,
 }
 impl EndpointDiscardBehavior {
     pub fn as_ptr(&self) -> *const i8 {
