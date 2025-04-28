@@ -11,7 +11,7 @@ type Result<T> = std::result::Result<T, EndpointPropsBuilderError>;
 
 #[derive(Error, Debug)]
 pub enum EndpointPropsBuilderError {
-    #[error("builder recieved invalid args")]
+    #[error("builder received invalid args")]
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
     MissingRequiredArgs(String),
