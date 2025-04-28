@@ -137,5 +137,5 @@ pub enum SessionError {
     #[error("could not provision endpoint. SolClient return code: {0} subcode: {1}")]
     EndpointProvisionError(SolClientReturnCode, SolClientSubCode),
     #[error("could not deprovision endpoint. SolClient return code: {0} subcode: {1}")]
-    EndPointDeprovisionError(SolClientReturnCode, SolClientSubCode),
+    EndpointDeprovisionError(SolClientReturnCode, SolClientSubCode),
 }
