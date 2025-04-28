@@ -15,8 +15,6 @@ pub enum EndpointPropsBuilderError {
     InvalidArgs(#[from] NulError),
     #[error("{0} arg need to be set")]
     MissingRequiredArgs(String),
-    #[error("{0} size need to be less than {1} found {2}")]
-    SizeErrorArgs(String, usize, usize),
 }
 
 /// Endpoint Configuration Properties
@@ -26,11 +24,11 @@ pub struct EndpointPropsBuilder {
     durable: Option<bool>,
     permission: Option<EndpointPermission>,
     access_type: Option<EndpointAccessType>,
-    quota_mb: Option<u64>,
-    max_msg_size: Option<u64>,
+    quota_mb: Option<u32>,
+    max_msg_size: Option<u32>,
     respects_msg_ttl: Option<bool>,
     discard_behavior: Option<EndpointDiscardBehavior>,
-    max_msg_redelivery: Option<u64>,
+    max_msg_redelivery: Option<u8>,
 }
 
 impl EndpointPropsBuilder {
@@ -85,13 +83,13 @@ impl EndpointPropsBuilder {
     /// Sets the maximum quota (in megabytes) for the endpoint.
     ///
     /// A value of 0 configures the endpoint to act as a Last-Value-Queue (LVQ), where the broker enforces a Queue depth of one.
-    pub fn quota_mb(mut self, quota_mb: u64) -> Self {
+    pub fn quota_mb(mut self, quota_mb: u32) -> Self {
         self.quota_mb = Some(quota_mb);
         self
     }
 
     /// Sets the maximum size (in bytes) for any one message stored in the endpoint.
-    pub fn max_msg_size(mut self, max_msg_size: u64) -> Self {
+    pub fn max_msg_size(mut self, max_msg_size: u32) -> Self {
         self.max_msg_size = Some(max_msg_size);
         self
     }
@@ -115,7 +113,7 @@ impl EndpointPropsBuilder {
     /// Defines how many message redelivery retries before discarding or moving the message to the DMQ.
     ///
     /// The valid range is {0..255}, where 0 means retry forever. Default: 0
-    pub fn max_msg_redelivery(mut self, max_msg_redelivery: u64) -> Self {
+    pub fn max_msg_redelivery(mut self, max_msg_redelivery: u8) -> Self {
         self.max_msg_redelivery = Some(max_msg_redelivery);
         self
     }

@@ -27,6 +27,8 @@ pub enum FlowBuilderError {
     InitializationFailure(SolClientReturnCode, SolClientSubCode),
     #[error("arg contains interior nul byte")]
     InvalidArgs(#[from] NulError),
+    #[error("{0} arg out of range. expected {1}, got {2}")]
+    OutOfRangedArgs(String, String, String),
 }
 
 type Result<T> = std::result::Result<T, FlowBuilderError>;
@@ -38,7 +40,7 @@ struct UncheckedFlowProps {
     bind_timeout_ms: Option<u32>,
     bind_entity_id: Option<FlowBindEntityId<String>>,
     bind_entity_durable: Option<FlowBindEntityDurable>,
-    window_size: Option<u32>,
+    window_size: Option<u8>,
     ack_mode: Option<FlowAckMode>,
     topic: Option<String>,
     max_bind_tries: Option<u32>,
@@ -47,11 +49,11 @@ struct UncheckedFlowProps {
     start_state: Option<bool>,
     selector: Option<String>,
     no_local: Option<bool>,
-    max_unacked_messages: Option<u32>,
+    max_unacked_messages: Option<i32>,
     browser: Option<bool>,
     active_flow_ind: Option<bool>,
     replay_start_location: Option<String>,
-    max_reconnect_tries: Option<u32>,
+    max_reconnect_tries: Option<i32>,
     reconnect_retry_interval_ms: Option<u32>,
     required_outcome_failed: Option<bool>,
     required_outcome_rejected: Option<bool>,
@@ -180,6 +182,12 @@ where
     ///
     /// The valid values are SOLCLIENT_FLOW_PROP_BIND_ENTITY_SUB, SOLCLIENT_FLOW_PROP_BIND_ENTITY_QUEUE, and SOLCLIENT_FLOW_PROP_BIND_ENTITY_TE.
     /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_BIND_ENTITY_ID]
+    ///
+    /// Sets the name of the Queue or Topic Endpoint that is the target of the bind.
+    ///
+    /// This property is ignored when the `BIND_ENTITY_ID` is [ffi::SOLCLIENT_FLOW_PROP_BIND_ENTITY_SUB].
+    /// The maximum length (not including NULL terminator) is [ffi::SOLCLIENT_BUFINFO_MAX_QUEUENAME_SIZE].
+    /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_BIND_NAME].
     pub fn bind_entity_id(mut self, entity_id: FlowBindEntityId<String>) -> Self {
         self.props.bind_entity_id = Some(entity_id);
         self
@@ -197,7 +205,7 @@ where
     ///
     /// This sets the maximum number of messages that can be in transit (that is, the messages are sent from the broker but are not yet delivered to the application).
     /// The valid range is 1..255. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_WINDOWSIZE]
-    pub fn window_size(mut self, size: u32) -> Self {
+    pub fn window_size(mut self, size: u8) -> Self {
         self.props.window_size = Some(size);
         self
     }
@@ -213,7 +221,7 @@ where
     /// Sets the topic to which the Flow is bound.
     ///
     /// When binding to a Topic endpoint, the Topic may be set in the bind. This parameter is ignored for Queue or subscriber binding.
-    /// The maximum length (not including NULL terminator) is SOLCLIENT_BUFINFO_MAX_TOPIC_SIZE. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_TOPIC]
+    /// The maximum length (not including NULL terminator) is [ffi::SOLCLIENT_BUFINFO_MAX_TOPIC_SIZE]. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_TOPIC]
     pub fn topic(mut self, topic: String) -> Self {
         self.props.topic = Some(topic);
         self
@@ -271,7 +279,7 @@ where
     ///
     /// This property may only be set when the Flow property SOLCLIENT_FLOW_PROP_ACKMODE is set to SOLCLIENT_FLOW_PROP_ACKMODE_CLIENT.
     /// Valid values are -1 and >0. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_MAX_UNACKED_MESSAGES]
-    pub fn max_unacked_messages(mut self, max: u32) -> Self {
+    pub fn max_unacked_messages(mut self, max: i32) -> Self {
         self.props.max_unacked_messages = Some(max);
         self
     }
@@ -306,7 +314,7 @@ where
     /// Sets the maximum number of attempts to reconnect the Flow.
     ///
     /// If this property is -1, it will retry forever. Otherwise it tries the configured maximum number of times. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_MAX_RECONNECT_TRIES]
-    pub fn max_reconnect_tries(mut self, tries: u32) -> Self {
+    pub fn max_reconnect_tries(mut self, tries: i32) -> Self {
         self.props.max_reconnect_tries = Some(tries);
         self
     }
@@ -524,41 +532,112 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
 
     fn try_from(props: UncheckedFlowProps) -> Result<Self> {
         let bind_timeout_ms = match props.bind_timeout_ms {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x <= 0 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "bind_time_out".to_string(),
+                        "> 0".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
         let bind_entity_id = match props.bind_entity_id {
-            Some(x) => Some(x.try_into()?),
+            Some(x) => {
+                let name_length = match &x {
+                    FlowBindEntityId::Sub => 0,
+                    FlowBindEntityId::Queue { queue_name: name }
+                    | FlowBindEntityId::Te {
+                        topic_endpoint_name: name,
+                    } => name.len() as u32,
+                };
+                if name_length > ffi::SOLCLIENT_BUFINFO_MAX_QUEUENAME_SIZE {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "bind_name".to_string(),
+                        format!("< {}", ffi::SOLCLIENT_BUFINFO_MAX_QUEUENAME_SIZE),
+                        format!("name length is {name_length}"),
+                    ));
+                }
+
+                Some(x.try_into()?)
+            }
             None => None,
         };
 
         let bind_entity_durable = props.bind_entity_durable;
 
         let window_size = match props.window_size {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x == 0 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "window_size".to_string(),
+                        "1 <= x <= 255".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
         let ack_mode = props.ack_mode;
 
         let topic = match props.topic {
-            Some(x) => Some(CString::new(x)?),
+            Some(x) => {
+                if x.len() as u32 > ffi::SOLCLIENT_BUFINFO_MAX_TOPIC_SIZE {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "topic".to_string(),
+                        format!("< {}", ffi::SOLCLIENT_BUFINFO_MAX_TOPIC_SIZE),
+                        x,
+                    ));
+                }
+                Some(CString::new(x)?)
+            }
             None => None,
         };
 
         let max_bind_tries = match props.max_bind_tries {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x == 0 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "max_bind_tries".to_string(),
+                        ">= 1".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
         let ack_timer_ms = match props.ack_timer_ms {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x < 20 || x > 1500 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "ack_timer_ms".to_string(),
+                        "20 <= x <= 1500".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
         let ack_threshold = match props.ack_threshold {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x < 1 || x > 75 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "ack_threshold".to_string(),
+                        "1 <= x <= 75".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
@@ -572,7 +651,16 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
         let no_local = props.no_local;
 
         let max_unacked_messages = match props.max_unacked_messages {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x < -1 || x == 0 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "max_unacked_messages".to_string(),
+                        "-1 or > 0".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
@@ -586,7 +674,16 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
         };
 
         let max_reconnect_tries = match props.max_reconnect_tries {
-            Some(x) => Some(CString::new(x.to_string())?),
+            Some(x) => {
+                if x < -1 {
+                    return Err(FlowBuilderError::OutOfRangedArgs(
+                        "max_reconnect_tries".to_string(),
+                        ">= -1".to_string(),
+                        x.to_string(),
+                    ));
+                }
+                Some(CString::new(x.to_string())?)
+            }
             None => None,
         };
 
