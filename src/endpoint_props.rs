@@ -49,39 +49,72 @@ impl EndpointPropsBuilder {
         }
     }
 
+    /// Sets the type of endpoint.
+    ///
+    /// The valid values are SOLCLIENT_ENDPOINT_PROP_QUEUE, SOLCLIENT_ENDPOINT_PROP_TE, and SOLCLIENT_ENDPOINT_PROP_CLIENT_NAME.
+    /// Default: [ffi::SOLCLIENT_ENDPOINT_PROP_TE]
     pub fn id(mut self, id: EndpointId<String>) -> Self {
         self.id = Some(id);
         self
     }
 
+    /// Sets the durability of the endpoint.
+    ///
+    /// Default: [ffi::SOLCLIENT_PROP_ENABLE_VAL], which means the endpoint is durable. Only SOLCLIENT_PROP_ENABLE_VAL is supported in solClient_session_endpointProvision().
     pub fn durable(mut self, durable: bool) -> Self {
         self.durable = Some(durable);
         self
     }
+
+    /// Sets the permissions for the created entity.
+    ///
+    /// Permissions can be SOLCLIENT_ENDPOINT_PERM_DELETE, SOLCLIENT_ENDPOINT_PERM_MODIFY_TOPIC, SOLCLIENT_ENDPOINT_PERM_CONSUME, SOLCLIENT_ENDPOINT_PERM_READ_ONLY, SOLCLIENT_ENDPOINT_PERM_NONE.
     pub fn permission(mut self, permission: EndpointPermission) -> Self {
         self.permission = Some(permission);
         self
     }
+
+    /// Sets the access type for the endpoint.
+    ///
+    /// This applies to durable Queues only.
     pub fn access_type(mut self, access_type: EndpointAccessType) -> Self {
         self.access_type = Some(access_type);
         self
     }
+
+    /// Sets the maximum quota (in megabytes) for the endpoint.
+    ///
+    /// A value of 0 configures the endpoint to act as a Last-Value-Queue (LVQ), where the broker enforces a Queue depth of one.
     pub fn quota_mb(mut self, quota_mb: u64) -> Self {
         self.quota_mb = Some(quota_mb);
         self
     }
+
+    /// Sets the maximum size (in bytes) for any one message stored in the endpoint.
     pub fn max_msg_size(mut self, max_msg_size: u64) -> Self {
         self.max_msg_size = Some(max_msg_size);
         self
     }
+
+    /// Configures the endpoint to observe message Time-to-Live (TTL) values and remove expired messages.
+    ///
+    /// Default: [ffi::SOLCLIENT_ENDPOINT_PROP_DEFAULT_RESPECTS_MSG_TTL]
     pub fn respects_msg_ttl(mut self, respects_msg_ttl: bool) -> Self {
         self.respects_msg_ttl = Some(respects_msg_ttl);
         self
     }
+
+    /// Sets the discard behavior for the endpoint.
+    ///
+    /// When a message cannot be added to an endpoint (e.g., maximum quota exceeded), this property controls the action the broker will perform towards the publisher.
     pub fn discard_behavior(mut self, discard_behavior: EndpointDiscardBehavior) -> Self {
         self.discard_behavior = Some(discard_behavior);
         self
     }
+
+    /// Defines how many message redelivery retries before discarding or moving the message to the DMQ.
+    ///
+    /// The valid range is {0..255}, where 0 means retry forever. Default: 0
     pub fn max_msg_redelivery(mut self, max_msg_redelivery: u64) -> Self {
         self.max_msg_redelivery = Some(max_msg_redelivery);
         self

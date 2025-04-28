@@ -31,6 +31,8 @@ pub enum FlowBuilderError {
 
 type Result<T> = std::result::Result<T, FlowBuilderError>;
 
+/// Flow Configuration Properties
+/// https://docs.solace.com/API-Developer-Online-Ref-Documentation/c/group__flow_props.html
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 struct UncheckedFlowProps {
     bind_timeout_ms: Option<u32>,
@@ -166,111 +168,180 @@ where
         }
     }
 
+    /// Sets the timeout (in milliseconds) used when creating a Flow in blocking mode.
+    ///
+    /// The valid range is > 0. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_BIND_TIMEOUT_MS]
     pub fn bind_timeout_ms(mut self, timeout: u32) -> Self {
         self.props.bind_timeout_ms = Some(timeout);
         self
     }
 
+    /// Sets the type of object to which this Flow is bound.
+    ///
+    /// The valid values are SOLCLIENT_FLOW_PROP_BIND_ENTITY_SUB, SOLCLIENT_FLOW_PROP_BIND_ENTITY_QUEUE, and SOLCLIENT_FLOW_PROP_BIND_ENTITY_TE.
+    /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_BIND_ENTITY_ID]
     pub fn bind_entity_id(mut self, entity_id: FlowBindEntityId<String>) -> Self {
         self.props.bind_entity_id = Some(entity_id);
         self
     }
 
+    /// Sets the durability of the object to which this Flow is bound.
+    ///
+    /// Default: [ffi::SOLCLIENT_PROP_ENABLE_VAL], which means the endpoint is durable. When set to [ffi::SOLCLIENT_PROP_DISABLE_VAL], a temporary endpoint is created.
     pub fn bind_entity_durable(mut self, durable: FlowBindEntityDurable) -> Self {
         self.props.bind_entity_durable = Some(durable);
         self
     }
 
+    /// Sets the Guaranteed message window size for the Flow.
+    ///
+    /// This sets the maximum number of messages that can be in transit (that is, the messages are sent from the broker but are not yet delivered to the application).
+    /// The valid range is 1..255. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_WINDOWSIZE]
     pub fn window_size(mut self, size: u32) -> Self {
         self.props.window_size = Some(size);
         self
     }
 
+    /// Sets the acknowledgment mode for the Flow.
+    ///
+    /// Possible values are SOLCLIENT_FLOW_PROP_ACKMODE_AUTO and SOLCLIENT_FLOW_PROP_ACKMODE_CLIENT. Default: SOLCLIENT_FLOW_PROP_ACKMODE_AUTO
     pub fn ack_mode(mut self, mode: FlowAckMode) -> Self {
         self.props.ack_mode = Some(mode);
         self
     }
 
+    /// Sets the topic to which the Flow is bound.
+    ///
+    /// When binding to a Topic endpoint, the Topic may be set in the bind. This parameter is ignored for Queue or subscriber binding.
+    /// The maximum length (not including NULL terminator) is SOLCLIENT_BUFINFO_MAX_TOPIC_SIZE. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_TOPIC]
     pub fn topic(mut self, topic: String) -> Self {
         self.props.topic = Some(topic);
         self
     }
 
+    /// Sets the maximum number of attempts to bind the Flow.
+    ///
+    /// The valid range is >= 1. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_MAX_BIND_TRIES]
     pub fn max_bind_tries(mut self, tries: u32) -> Self {
         self.props.max_bind_tries = Some(tries);
         self
     }
 
+    /// Sets the timer (in milliseconds) for sending acknowledgments.
+    ///
+    /// The valid range is 20..1500. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_ACK_TIMER_MS]
     pub fn ack_timer_ms(mut self, timer: u32) -> Self {
         self.props.ack_timer_ms = Some(timer);
         self
     }
 
+    /// Sets the threshold for sending an acknowledgment, configured as a percentage.
+    ///
+    /// The valid range is 1..75. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_ACK_THRESHOLD]
     pub fn ack_threshold(mut self, threshold: u8) -> Self {
         self.props.ack_threshold = Some(threshold);
         self
     }
 
+    /// Controls whether the Flow should be created in a start or stop state with respect to receiving messages.
+    ///
+    /// Flow start/stop state can be changed later through solClient_flow_start() or solClient_flow_stop(). Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_START_STATE]
     pub fn start_state(mut self, state: bool) -> Self {
         self.props.start_state = Some(state);
         self
     }
 
+    /// Sets the selector for filtering messages on the Flow.
+    ///
+    /// A Java Message System (JMS) defined selector.
     pub fn selector(mut self, selector: String) -> Self {
         self.props.selector = Some(selector);
         self
     }
 
+    /// Controls whether the Flow should exclude messages published by the same client.
+    ///
+    /// When a Flow has the No Local property enabled, messages published on the Session cannot appear in a Flow created in the same Session, even if the endpoint contains a subscription that matches the published message.
     pub fn no_local(mut self, no_local: bool) -> Self {
         self.props.no_local = Some(no_local);
         self
     }
 
+    /// Sets the maximum number of unacknowledged messages allowed on the Flow.
+    ///
+    /// This property may only be set when the Flow property SOLCLIENT_FLOW_PROP_ACKMODE is set to SOLCLIENT_FLOW_PROP_ACKMODE_CLIENT.
+    /// Valid values are -1 and >0. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_MAX_UNACKED_MESSAGES]
     pub fn max_unacked_messages(mut self, max: u32) -> Self {
         self.props.max_unacked_messages = Some(max);
         self
     }
 
+    /// Indicates whether the Flow operates in browser mode.
+    ///
+    /// A browser flow allows client applications to look at messages spooled on Endpoints without removing them. Messages are browsed from oldest to newest.
+    /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_BROWSER]
     pub fn browser(mut self, browser: bool) -> Self {
         self.props.browser = Some(browser);
         self
     }
 
+    /// Enables Active Flow Indication, which sends events when the Flow becomes active or inactive.
+    ///
+    /// If the underlying session capabilities indicate that the broker does not support active flow indications, then solClient_session_createFlow() will fail immediately.
+    /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_ACTIVE_FLOW_IND]
     pub fn active_flow_ind(mut self, active: bool) -> Self {
         self.props.active_flow_ind = Some(active);
         self
     }
 
+    /// Sets the starting location for replaying messages on the Flow.
+    ///
+    /// The replay start location may be SOLCLIENT_FLOW_PROP_REPLAY_START_LOCATION_BEGINNING to indicate that all messages available should be replayed.
+    /// Examples: ex/messageReplay.c, and ex/simpleFlowToQueue.c.
     pub fn replay_start_location(mut self, location: String) -> Self {
         self.props.replay_start_location = Some(location);
         self
     }
 
+    /// Sets the maximum number of attempts to reconnect the Flow.
+    ///
+    /// If this property is -1, it will retry forever. Otherwise it tries the configured maximum number of times. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_MAX_RECONNECT_TRIES]
     pub fn max_reconnect_tries(mut self, tries: u32) -> Self {
         self.props.max_reconnect_tries = Some(tries);
         self
     }
 
+    /// Sets the interval (in milliseconds) between reconnect attempts for the Flow.
+    ///
+    /// Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_RECONNECT_RETRY_INTERVAL_MS]
     pub fn reconnect_retry_interval_ms(mut self, interval: u32) -> Self {
         self.props.reconnect_retry_interval_ms = Some(interval);
         self
     }
 
+    /// Indicates whether the Flow requires an outcome of "failed" for messages.
+    ///
+    /// Ignored on transacted sessions. Requires [ffi::SOLCLIENT_SESSION_CAPABILITY_AD_APP_ACK_FAILED]. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_REQUIRED_OUTCOME_FAILED]
     pub fn required_outcome_failed(mut self, failed: bool) -> Self {
         self.props.required_outcome_failed = Some(failed);
         self
     }
 
+    /// Indicates whether the Flow requires an outcome of "rejected" for messages.
+    ///
+    /// Ignored on transacted sessions. Requires [ffi::SOLCLIENT_SESSION_CAPABILITY_AD_APP_ACK_FAILED]. Default: [ffi::SOLCLIENT_FLOW_PROP_DEFAULT_REQUIRED_OUTCOME_REJECTED]
     pub fn required_outcome_rejected(mut self, rejected: bool) -> Self {
         self.props.required_outcome_rejected = Some(rejected);
         self
     }
 
+    /// Sets the callback for handling inbound messages on the Flow.
     pub fn on_message(mut self, on_message: FM) -> Self {
         self.on_message = Some(on_message);
         self
     }
 
+    /// Sets the callback for handling events on the Flow.
     pub fn on_event(mut self, on_event: FE) -> Self {
         self.on_event = Some(on_event);
         self
