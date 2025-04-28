@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 use solace_rs_sys as ffi;
 use std::mem;
 
-use crate::message::InboundMessage;
+use crate::message::inbound::FlowInboundMessage;
 
 use super::event::FlowEvent;
 
@@ -10,7 +10,7 @@ pub(crate) fn on_message_trampoline<'s, F>(
     _closure: &'s F,
 ) -> ffi::solClient_flow_rxMsgCallbackFunc_t
 where
-    F: FnMut(InboundMessage) + Send + 's,
+    F: FnMut(FlowInboundMessage) + Send + 's,
 {
     Some(static_on_message::<F>)
 }
@@ -31,15 +31,15 @@ pub(crate) extern "C" fn static_no_op_on_message(
 }
 
 extern "C" fn static_on_message<'s, F>(
-    _opaque_flow_p: ffi::solClient_opaqueFlow_pt, // non-null
-    msg_p: ffi::solClient_opaqueMsg_pt,           // non-null
+    opaque_flow_p: ffi::solClient_opaqueFlow_pt,   // non-null
+    msg_p: ffi::solClient_opaqueMsg_pt,            // non-null
     raw_user_closure: *mut ::std::os::raw::c_void, // can be null
 ) -> ffi::solClient_rxMsgCallback_returnCode_t
 where
     // not completely sure if this is supposed to be FnMut or FnOnce
     // threading takes in FnOnce - that is why I suspect it might be FnOnce.
     // But not enough knowledge to make sure it is FnOnce.
-    F: FnMut(InboundMessage) + Send + 's,
+    F: FnMut(FlowInboundMessage) + Send + 's,
 {
     // this function is glue code to allow users to pass in closures
     // we duplicate the message pointer (which does not copy over the binary data)
@@ -52,7 +52,7 @@ where
         return ffi::solClient_rxMsgCallback_returnCode_SOLCLIENT_CALLBACK_OK;
     };
 
-    let message = InboundMessage::from(msg_p);
+    let message = FlowInboundMessage::from((msg_p, opaque_flow_p));
     let user_closure: &mut Box<F> = unsafe { mem::transmute(raw_user_closure) };
     user_closure(message);
 

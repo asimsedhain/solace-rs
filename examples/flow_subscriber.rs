@@ -13,7 +13,7 @@ use solace_rs::{
         builder::{FlowAckMode, FlowBindEntityDurable, FlowBindEntityId},
         event::FlowEvent,
     },
-    message::InboundMessage,
+    message::{inbound::FlowInboundMessage, InboundMessage},
     session::SessionEvent,
     Context, SolaceLogLevel,
 };
@@ -82,8 +82,12 @@ fn main() {
         .reconnect_retry_interval_ms(500)
         .required_outcome_failed(false)
         .required_outcome_rejected(false)
-        .on_message(move |message: InboundMessage| {
+        .on_message(move |message: FlowInboundMessage| {
             println!("on_message handler in flow got: {:#?} ", message);
+            match message.try_ack() {
+                Ok(_) => println!("Acked message"),
+                Err(e) => println!("Failed to ack message: {}", e),
+            }
         })
         .on_event(|event: FlowEvent| {
             println!("on_event handler in flow got: {:#?}", event);

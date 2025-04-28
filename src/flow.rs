@@ -7,14 +7,18 @@ use solace_rs_sys as ffi;
 use std::marker::PhantomData;
 use tracing::warn;
 
-use crate::{message::InboundMessage, session::SessionEvent, Session, SolClientReturnCode};
+use crate::{
+    message::{inbound::FlowInboundMessage, InboundMessage},
+    session::SessionEvent,
+    Session, SolClientReturnCode,
+};
 
 pub struct Flow<
     'flow,
     'session,
     SM: FnMut(InboundMessage) + Send + 'session,
     SE: FnMut(SessionEvent) + Send + 'session,
-    FM: FnMut(InboundMessage) + Send + 'flow,
+    FM: FnMut(FlowInboundMessage) + Send + 'flow,
     FE: FnMut(FlowEvent) + Send + 'flow,
 > {
     pub(crate) lifetime: PhantomData<&'flow ()>,
@@ -36,7 +40,7 @@ pub struct Flow<
 unsafe impl<
         SM: FnMut(InboundMessage) + Send,
         SE: FnMut(SessionEvent) + Send,
-        FM: FnMut(InboundMessage) + Send,
+        FM: FnMut(FlowInboundMessage) + Send,
         FE: FnMut(FlowEvent) + Send,
     > Send for Flow<'_, '_, SM, SE, FM, FE>
 {
@@ -45,7 +49,7 @@ unsafe impl<
 impl<
         SM: FnMut(InboundMessage) + Send,
         SE: FnMut(SessionEvent) + Send,
-        FM: FnMut(InboundMessage) + Send,
+        FM: FnMut(FlowInboundMessage) + Send,
         FE: FnMut(FlowEvent) + Send,
     > Drop for Flow<'_, '_, SM, SE, FM, FE>
 {

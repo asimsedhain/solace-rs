@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     endpoint_props::EndpointProps,
-    message::InboundMessage,
+    message::{inbound::FlowInboundMessage, InboundMessage},
     session::SessionEvent,
     util::{bool_to_ptr, get_last_error_info},
     Session, SolClientReturnCode, SolClientSubCode,
@@ -90,7 +90,7 @@ impl<'builder, 'flow, 'session, SM, SE, FM, FE> FlowBuilder<'builder, 'session, 
 where
     SM: FnMut(InboundMessage) + Send + 'session,
     SE: FnMut(SessionEvent) + Send + 'session,
-    FM: FnMut(InboundMessage) + Send + 'flow,
+    FM: FnMut(FlowInboundMessage) + Send + 'flow,
     FE: FnMut(FlowEvent) + Send + 'flow,
     'builder: 'flow,
 {

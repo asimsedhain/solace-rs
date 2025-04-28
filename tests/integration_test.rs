@@ -8,8 +8,8 @@ use std::{
 
 use solace_rs::{
     message::{
-        DeliveryMode, DestinationType, InboundMessage, Message, MessageDestination,
-        OutboundMessageBuilder,
+        inbound::InboundMessageTrait, DeliveryMode, DestinationType, InboundMessage, Message,
+        MessageDestination, OutboundMessageBuilder,
     },
     session::SessionEvent,
     Context, SolaceLogLevel,
