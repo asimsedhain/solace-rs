@@ -219,7 +219,7 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
 
         if !rc.is_ok() {
             let subcode = get_last_error_info();
-            return Err(SessionError::EndpointProvisionError(rc, subcode));
+            return Err(SessionError::EndpointDeprovisionError(rc, subcode));
         }
         Ok(())
     }
