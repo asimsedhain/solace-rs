@@ -176,8 +176,9 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
         }
 
         let rc = unsafe {
+            let mut props_raw = endpoint_props.to_raw();
             ffi::solClient_session_endpointProvision(
-                endpoint_props.to_raw().as_mut_ptr(),
+                props_raw.as_mut_ptr(),
                 self._session_ptr,
                 flag,
                 std::ptr::null_mut(),

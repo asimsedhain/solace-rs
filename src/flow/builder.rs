@@ -146,8 +146,9 @@ where
             };
 
         let flow_create_raw_rc = unsafe {
+            let mut checked_props_raw = checked_props.to_raw();
             ffi::solClient_session_createFlow(
-                checked_props.to_raw().as_mut_ptr(),
+                checked_props_raw.as_mut_ptr(),
                 self.session._session_ptr,
                 &mut flow_ptr,
                 &mut flow_func_info,
