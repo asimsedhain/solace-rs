@@ -119,6 +119,8 @@ pub enum FlowInboundMessageAckError {
     MessageNotFound,
     #[error("Ack failed: subcode {0}")]
     AckFailed(SolClientSubCode),
+    #[error("Flow was freed before message ack")]
+    FlowFreedBeforeAck,
 }
 
 impl FlowInboundMessage {
@@ -139,6 +141,9 @@ impl FlowInboundMessage {
         }
 
         let send_ack_return_code = unsafe {
+            if self._flow_ptr.is_null() {
+                return Err(FlowInboundMessageAckError::FlowFreedBeforeAck);
+            }
             let send_ack_return_code_raw = ffi::solClient_flow_sendAck(self._flow_ptr, message_id);
             SolClientReturnCode::from_raw(send_ack_return_code_raw)
         };
