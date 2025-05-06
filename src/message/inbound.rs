@@ -51,7 +51,7 @@ impl From<ffi::solClient_opaqueMsg_pt> for InboundMessage {
     }
 }
 
-impl<'a> Message<'a> for InboundMessage {
+impl Message<'_> for InboundMessage {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
         self._msg_ptr
     }
@@ -105,7 +105,7 @@ impl From<(ffi::solClient_opaqueMsg_pt, ffi::solClient_opaqueFlow_pt)> for FlowI
     }
 }
 
-impl<'a> Message<'a> for FlowInboundMessage {
+impl Message<'_> for FlowInboundMessage {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
         self._msg_ptr
     }

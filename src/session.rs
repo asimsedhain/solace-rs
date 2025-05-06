@@ -228,7 +228,7 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
     pub fn flow_builder<'builder, OnMessage, OnEvent>(
         &'builder self,
     ) -> FlowBuilder<'builder, 'session, M, E, OnMessage, OnEvent> {
-        FlowBuilder::new(&self)
+        FlowBuilder::new(self)
     }
 }
 

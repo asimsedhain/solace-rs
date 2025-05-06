@@ -161,7 +161,7 @@ where
             Ok(Flow {
                 lifetime: PhantomData,
                 _flow_ptr: flow_ptr,
-                session: &self.session,
+                session: self.session,
                 _msg_fn_ptr: msg_func_ptr,
                 _event_fn_ptr: event_func_ptr,
             })
@@ -534,7 +534,7 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
     fn try_from(props: UncheckedFlowProps) -> Result<Self> {
         let bind_timeout_ms = match props.bind_timeout_ms {
             Some(x) => {
-                if x <= 0 {
+                if x == 0 {
                     return Err(FlowBuilderError::OutOfRangedArgs(
                         "bind_time_out".to_string(),
                         "> 0".to_string(),
@@ -616,7 +616,7 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
 
         let ack_timer_ms = match props.ack_timer_ms {
             Some(x) => {
-                if x < 20 || x > 1500 {
+                if !(20..=1500).contains(&x) {
                     return Err(FlowBuilderError::OutOfRangedArgs(
                         "ack_timer_ms".to_string(),
                         "20 <= x <= 1500".to_string(),
@@ -630,7 +630,7 @@ impl TryFrom<UncheckedFlowProps> for CheckedFlowProps {
 
         let ack_threshold = match props.ack_threshold {
             Some(x) => {
-                if x < 1 || x > 75 {
+                if !(1..=75).contains(&x) {
                     return Err(FlowBuilderError::OutOfRangedArgs(
                         "ack_threshold".to_string(),
                         "1 <= x <= 75".to_string(),

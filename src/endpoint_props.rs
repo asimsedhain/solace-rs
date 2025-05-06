@@ -31,6 +31,12 @@ pub struct EndpointPropsBuilder {
     max_msg_redelivery: Option<u8>,
 }
 
+impl Default for EndpointPropsBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EndpointPropsBuilder {
     /// Creates a new `EndpointPropsBuilder` with default properties.
     pub fn new() -> Self {
@@ -207,12 +213,12 @@ impl EndpointProps {
 
         if let Some(quota_mb) = &self.quota_mb {
             props.push(ffi::SOLCLIENT_ENDPOINT_PROP_QUOTA_MB.as_ptr() as *const i8);
-            props.push(quota_mb.as_ptr() as *const i8);
+            props.push(quota_mb.as_ptr());
         }
 
         if let Some(max_msg_size) = &self.max_msg_size {
             props.push(ffi::SOLCLIENT_ENDPOINT_PROP_MAXMSG_SIZE.as_ptr() as *const i8);
-            props.push(max_msg_size.as_ptr() as *const i8);
+            props.push(max_msg_size.as_ptr());
         }
 
         if let Some(respects_msg_ttl) = self.respects_msg_ttl {
@@ -227,7 +233,7 @@ impl EndpointProps {
 
         if let Some(max_msg_redelivery) = &self.max_msg_redelivery {
             props.push(ffi::SOLCLIENT_ENDPOINT_PROP_MAXMSG_REDELIVERY.as_ptr() as *const i8);
-            props.push(max_msg_redelivery.as_ptr() as *const i8);
+            props.push(max_msg_redelivery.as_ptr());
         }
 
         props.push(ptr::null());
