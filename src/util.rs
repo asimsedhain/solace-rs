@@ -107,3 +107,11 @@ pub(crate) fn get_last_error_info() -> SolClientSubCode {
         }
     }
 }
+
+pub(crate) fn bool_to_ptr(b: bool) -> *const i8 {
+    if b {
+        ffi::SOLCLIENT_PROP_ENABLE_VAL.as_ptr() as *const i8
+    } else {
+        ffi::SOLCLIENT_PROP_DISABLE_VAL.as_ptr() as *const i8
+    }
+}

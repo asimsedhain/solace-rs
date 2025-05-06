@@ -1,5 +1,7 @@
 pub mod cache_session;
 pub mod context;
+pub mod endpoint_props;
+pub mod flow;
 pub mod message;
 pub mod session;
 pub(crate) mod util;
@@ -132,4 +134,8 @@ pub enum SessionError {
     PublishError(SolClientReturnCode, SolClientSubCode),
     #[error("could not send request. SolClient return code: {0}")]
     RequestError(SolClientReturnCode, SolClientSubCode),
+    #[error("could not provision endpoint. SolClient return code: {0} subcode: {1}")]
+    EndpointProvisionError(SolClientReturnCode, SolClientSubCode),
+    #[error("could not deprovision endpoint. SolClient return code: {0} subcode: {1}")]
+    EndpointDeprovisionError(SolClientReturnCode, SolClientSubCode),
 }

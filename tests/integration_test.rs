@@ -7,7 +7,10 @@ use std::{
 };
 
 use solace_rs::{
+    endpoint_props::{EndpointId, EndpointPropsBuilder},
+    flow::builder::{FlowAckMode, FlowBindEntityId},
     message::{
+        inbound::{FlowInboundMessage, InboundMessageTrait},
         DeliveryMode, DestinationType, InboundMessage, Message, MessageDestination,
         OutboundMessageBuilder,
     },
@@ -556,4 +559,189 @@ fn request_and_reply() {
         assert!(res.join().is_ok());
         assert!(req.join().is_ok());
     });
+}
+
+#[test]
+#[ignore]
+fn subscribe_and_publish_with_queue() {
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
+
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let tx_msgs = vec!["helo", "hello2", "hello4", "helo5"];
+    let queue_name = "subscribe_and_publish_with_queue";
+
+    let on_message = move |message: FlowInboundMessage| {
+        let Ok(Some(payload)) = message.get_payload() else {
+            return;
+        };
+        let _ = tx.send(payload.to_owned());
+    };
+
+    let session = solace_context
+        .session(
+            format!("tcp://{}:{}", host, port),
+            "default",
+            "default",
+            "",
+            None::<fn(InboundMessage)>,
+            None::<fn(SessionEvent)>,
+        )
+        .expect("creating session");
+
+    // Provision a queue
+    let endpoint_props = EndpointPropsBuilder::new()
+        .id(EndpointId::Queue {
+            name: queue_name.to_string(),
+        })
+        .build()
+        .expect("building endpoint props");
+    session
+        .endpoint_provision(endpoint_props.clone(), true)
+        .expect("provisioning queue");
+
+    sleep(SLEEP_TIME);
+
+    // Subscribe to the queue
+    let flow = session
+        .flow_builder()
+        .bind_entity_id(FlowBindEntityId::Queue {
+            queue_name: queue_name.to_string(),
+        })
+        .ack_mode(FlowAckMode::Auto)
+        .on_message(on_message)
+        .on_event(|_| {})
+        .build()
+        .expect("subscribing to queue");
+
+    // need to wait before publishing so that the client is properly subscribed
+    sleep(SLEEP_TIME);
+
+    for msg in tx_msgs.clone() {
+        let dest = MessageDestination::new(DestinationType::Queue, queue_name).unwrap();
+        let outbound_msg = OutboundMessageBuilder::new()
+            .destination(dest)
+            .delivery_mode(DeliveryMode::Persistent)
+            .payload(msg)
+            .build()
+            .expect("building outbound msg");
+        session.publish(outbound_msg).expect("publishing message");
+    }
+    sleep(SLEEP_TIME);
+
+    let mut rx_msgs = vec![];
+
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
+                let str = String::from_utf8_lossy(&msg).to_string();
+                rx_msgs.push(str);
+                if rx_msgs.len() == tx_msgs.len() {
+                    break;
+                }
+            }
+            _ => panic!(),
+        }
+    }
+
+    // Deprovision queue and cleanup
+    drop(flow);
+    session.endpoint_deprovision(endpoint_props, true).unwrap();
+    sleep(SLEEP_TIME);
+
+    assert_eq!(tx_msgs, rx_msgs);
+}
+
+#[test]
+#[ignore]
+fn flow_message_ack() {
+    let host = option_env!("SOLACE_HOST").unwrap_or(DEFAULT_HOST);
+    let port = option_env!("SOLACE_PORT").unwrap_or(DEFAULT_PORT);
+    let queue_name = "flow_message_ack";
+    let solace_context = Context::new(SolaceLogLevel::Warning).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let tx_msgs = vec!["ack1", "ack2", "ack3"];
+
+    // Provision a queue
+    let endpoint_props = EndpointPropsBuilder::new()
+        .id(EndpointId::Queue {
+            name: queue_name.to_string(),
+        })
+        .build()
+        .expect("building endpoint props");
+    let session = solace_context
+        .session(
+            format!("tcp://{}:{}", host, port),
+            "default",
+            "default",
+            "",
+            None::<fn(InboundMessage)>,
+            None::<fn(SessionEvent)>,
+        )
+        .expect("creating session");
+    session
+        .endpoint_provision(endpoint_props.clone(), true)
+        .expect("provisioning queue");
+
+    sleep(SLEEP_TIME);
+
+    // Subscribe to the queue with client ack mode
+    let flow = session
+        .flow_builder()
+        .bind_entity_id(FlowBindEntityId::Queue {
+            queue_name: queue_name.to_string(),
+        })
+        .ack_mode(FlowAckMode::Client)
+        .on_message({
+            let tx = tx.clone();
+            move |message: FlowInboundMessage| {
+                let Ok(Some(payload)) = message.get_payload() else {
+                    return;
+                };
+                // Ack the message
+                message.try_ack().expect("acknowledging message");
+                let _ = tx.send(payload.to_owned());
+            }
+        })
+        .on_event(|_| {})
+        .build()
+        .expect("subscribing to queue");
+
+    sleep(SLEEP_TIME);
+
+    // Publish messages
+    for msg in tx_msgs.clone() {
+        let dest = MessageDestination::new(DestinationType::Queue, queue_name).unwrap();
+        let outbound_msg = OutboundMessageBuilder::new()
+            .destination(dest)
+            .delivery_mode(DeliveryMode::Persistent)
+            .payload(msg)
+            .build()
+            .expect("building outbound msg");
+        session.publish(outbound_msg).expect("publishing message");
+    }
+
+    sleep(SLEEP_TIME);
+
+    let mut rx_msgs = vec![];
+    loop {
+        match rx.try_recv() {
+            Ok(msg) => {
+                let str = String::from_utf8_lossy(&msg).to_string();
+                rx_msgs.push(str);
+                if rx_msgs.len() == tx_msgs.len() {
+                    break;
+                }
+            }
+            _ => panic!(),
+        }
+    }
+
+    // Deprovision queue and cleanup
+    drop(flow);
+    session.endpoint_deprovision(endpoint_props, true).unwrap();
+    sleep(SLEEP_TIME);
+
+    assert_eq!(tx_msgs, rx_msgs);
 }
