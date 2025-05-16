@@ -410,7 +410,10 @@ where
         self.props.modifyprop_timeout_ms = Some(modifyprop_timeout_ms);
         self
     }
-    pub fn ssl_trust_store_dir<ClientName: Into<Vec<u8>>>(mut self, ssl_trust_store_dir: ClientName) -> Self {
+    pub fn ssl_trust_store_dir<ClientName: Into<Vec<u8>>>(
+        mut self,
+        ssl_trust_store_dir: ClientName,
+    ) -> Self {
         self.props.ssl_trust_store_dir = Some(ssl_trust_store_dir.into());
         self
     }
@@ -811,7 +814,6 @@ where
             Some(x) => Some(CString::new(x)?),
             None => None,
         };
-        
 
         Ok(Self {
             host_name,
@@ -844,7 +846,7 @@ where
             calculate_message_expiration: value.calculate_message_expiration,
             no_local: value.no_local,
             modifyprop_timeout_ms,
-            ssl_trust_store_dir
+            ssl_trust_store_dir,
         })
     }
 }
