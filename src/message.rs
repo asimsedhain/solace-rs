@@ -115,11 +115,7 @@ pub trait Message<'a> {
         let mut buffer_len: u32 = 0;
 
         let msg_ops_rc = unsafe {
-            ffi::solClient_msg_getXmlPtr(
-                self.get_raw_message_ptr(),
-                &mut buffer,
-                &mut buffer_len,
-            )
+            ffi::solClient_msg_getXmlPtr(self.get_raw_message_ptr(), &mut buffer, &mut buffer_len)
         };
 
         let rc = SolClientReturnCode::from_raw(msg_ops_rc);
