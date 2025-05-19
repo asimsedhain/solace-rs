@@ -43,7 +43,7 @@ impl Drop for OutboundMessage {
     }
 }
 
-impl<'a> Message<'a> for OutboundMessage {
+impl Message<'_> for OutboundMessage {
     unsafe fn get_raw_message_ptr(&self) -> ffi::solClient_opaqueMsg_pt {
         self._msg_ptr
     }

@@ -6,6 +6,8 @@ pub use event::SessionEvent;
 
 use crate::cache_session::CacheSession;
 use crate::context::Context;
+use crate::endpoint_props::EndpointProps;
+use crate::flow::builder::FlowBuilder;
 use crate::message::{InboundMessage, Message, OutboundMessage};
 use crate::util::get_last_error_info;
 use crate::SessionError;
@@ -161,6 +163,72 @@ impl<'session, M: FnMut(InboundMessage) + Send, E: FnMut(SessionEvent) + Send>
             return Err(SessionError::DisconnectError(rc, subcode));
         }
         Ok(())
+    }
+
+    pub fn endpoint_provision(
+        &self,
+        endpoint_props: EndpointProps,
+        ignore_already_exists_error: bool,
+    ) -> Result<()> {
+        let mut flag = ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM;
+        if ignore_already_exists_error {
+            flag |= ffi::SOLCLIENT_PROVISION_FLAGS_IGNORE_EXIST_ERRORS;
+        }
+
+        let rc = unsafe {
+            let mut props_raw = endpoint_props.to_raw();
+            ffi::solClient_session_endpointProvision(
+                props_raw.as_mut_ptr(),
+                self._session_ptr,
+                flag,
+                std::ptr::null_mut(),
+                // deprecated params
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
+            let subcode = get_last_error_info();
+            return Err(SessionError::EndpointProvisionError(rc, subcode));
+        }
+        Ok(())
+    }
+
+    pub fn endpoint_deprovision(
+        &self,
+        endpoint_props: EndpointProps,
+        ignore_already_exists_error: bool,
+    ) -> Result<()> {
+        let mut flag = ffi::SOLCLIENT_PROVISION_FLAGS_WAITFORCONFIRM;
+        if ignore_already_exists_error {
+            flag |= ffi::SOLCLIENT_PROVISION_FLAGS_IGNORE_EXIST_ERRORS;
+        }
+
+        let rc = unsafe {
+            ffi::solClient_session_endpointDeprovision(
+                endpoint_props.to_raw().as_mut_ptr(),
+                self._session_ptr,
+                flag,
+                std::ptr::null_mut(),
+            )
+        };
+
+        let rc = SolClientReturnCode::from_raw(rc);
+
+        if !rc.is_ok() {
+            let subcode = get_last_error_info();
+            return Err(SessionError::EndpointDeprovisionError(rc, subcode));
+        }
+        Ok(())
+    }
+
+    pub fn flow_builder<'builder, OnMessage, OnEvent>(
+        &'builder self,
+    ) -> FlowBuilder<'builder, 'session, M, E, OnMessage, OnEvent> {
+        FlowBuilder::new(self)
     }
 }
 
